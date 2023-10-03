@@ -1,0 +1,11 @@
+version: 0.1
+phases:
+  pre_build:
+    commands:
+      - echo "[Pre-build phase]"
+  build:
+    commands:
+      - echo "[Build phase]"
+  post_build:
+    commands:
+      - echo "[Post-build phase]"
