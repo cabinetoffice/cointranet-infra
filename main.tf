@@ -4,9 +4,9 @@ provider "aws" {
 
 terraform {
   backend "s3" {
-    bucket = "cointranet-state"
+    bucket = "co-digital-proof-of-concepts-tfstate"
     key    = "terraform/dev"
-    region = "us-east-1"
+    region = "eu-west-2"
   }
 }
 
@@ -14,12 +14,12 @@ data "aws_availability_zones" "available" {}
 
 locals {
   region = "eu-west-2"
-  name   = "intranet-${basename(path.cwd)}"
+  name   = "${basename(path.cwd)}"
 
   vpc_cidr = "10.0.0.0/16" # TODO: do we definitely need these to be unique?
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 
-  container_name = "intranet-wagtail"
+  container_name = "wagtail"
   container_port = 80
 
   tags = {
@@ -65,14 +65,14 @@ module "ecs_service" {
 
   # Service
   name        = local.name
-  cluster_arn = module.ecs_cluster.arn
+  cluster_arn = module.ecs_cluster.cluster_arn
 
   # Task Definition
   requires_compatibilities = ["EC2"]
   capacity_provider_strategy = {
     # On-demand instances
     intranet = {
-      capacity_provider = module.ecs_cluster.autoscaling_capacity_providers["ex-1"].name
+      capacity_provider = module.ecs_cluster.autoscaling_capacity_providers["intranet"].name
       weight            = 1
       base              = 1
     }
@@ -175,7 +175,7 @@ module "alb" {
 
   target_groups = [
     {
-      name             = "${local.name}-${local.container_name}"
+      name             = substr("${local.name}-${local.container_name}",0,32)
       backend_protocol = "HTTP"
       backend_port     = local.container_port
       target_type      = "ip"
@@ -191,7 +191,7 @@ module "autoscaling" {
 
   for_each = {
     # Intranet
-    ex-1 = {
+    intranet = {
       instance_type              = "t3.large"
       use_mixed_instances_policy = false
       mixed_instances_policy     = {}
