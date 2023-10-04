@@ -3,6 +3,7 @@ phases:
   pre_build:
     commands:
       - echo "[Pre-build phase]"
+      - terraform init
       - terraform plan
   build:
     commands:
