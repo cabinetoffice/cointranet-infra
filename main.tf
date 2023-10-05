@@ -90,13 +90,6 @@ module "ecs_service" {
         }
       ]
 
-      mount_points = [ # TODO: do we definitely need mount points here?
-        {
-          sourceVolume  = "my-vol",
-          containerPath = "/var/www/my-vol"
-        }
-      ]
-
       entry_point = ["/usr/sbin/apache2", "-D", "FOREGROUND"] # TODO: use wagtail!
 
       # Example image used requires access to write to root filesystem
