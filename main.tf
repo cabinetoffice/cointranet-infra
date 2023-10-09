@@ -16,6 +16,7 @@ data "aws_caller_identity" "current" {}
 locals {
   region = "eu-west-2"
   name   = "${basename(path.cwd)}"
+  account_id = data.aws_caller_identity.current.account_id
 
   vpc_cidr = "10.0.0.0/16" # TODO: do we definitely need these to be unique?
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
@@ -25,7 +26,6 @@ locals {
 
   tags = {
     Name       = local.name
-    Repository = "https://github.com/terraform-aws-modules/terraform-aws-ecs"
   }
 }
 
@@ -301,6 +301,213 @@ module "ecr" {
       }
     ]
   })
+
+  tags = local.tags
+}
+
+################################################################################
+# Continuous integration
+################################################################################
+
+data "aws_iam_policy_document" "terraform_assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["codebuild.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "terraform_ci" {
+  name               = "terraform_ci"
+  assume_role_policy = data.aws_iam_policy_document.terraform_assume_role.json
+}
+
+data "aws_iam_policy_document" "terraform_ci" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+
+    resources = ["*"]
+  }
+  
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "s3:*",
+      "iam:*",
+      "logs:*",
+      "codebuild:*",
+    ]
+
+    resources = ["*"] # TODO: lock this down to the bucket that is in use for state
+  }
+
+}
+
+resource "aws_iam_role_policy" "terraform_ci" {
+  role   = aws_iam_role.terraform_ci.name
+  policy = data.aws_iam_policy_document.terraform_ci.json
+}
+
+resource "aws_codebuild_project" "terraform_ci" {
+  name          = "${local.name}-terraform"
+  description   = "terraform builds"
+  build_timeout = "5"
+  service_role  = aws_iam_role.terraform_ci.arn
+
+  artifacts {
+    type = "NO_ARTIFACTS"
+  }
+
+  cache {
+    type = "NO_CACHE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "registry-1.docker.io/hashicorp/terraform:1.4"
+    type                        = "LINUX_CONTAINER"
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "REPOSITORY_URL"
+      value = module.ecr.repository_url
+    }
+
+    environment_variable {
+      name  = "DEFAULT_AWS_REGION"
+      value = local.region
+    }
+  }
+
+  source {
+    type            = "GITHUB"
+    location        = "https://github.com/cabinetoffice/cointranet-infra.git"
+    git_clone_depth = 1
+
+    git_submodules_config {
+      fetch_submodules = true
+    }
+  }
+
+  source_version = "main"
+
+  tags = local.tags
+}
+
+
+data "aws_iam_policy_document" "docker_assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["codebuild.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "docker_ci" {
+  name               = "docker_ci"
+  assume_role_policy = data.aws_iam_policy_document.docker_assume_role.json
+}
+
+data "aws_iam_policy_document" "docker_ci" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+
+    resources = ["*"]
+  }
+  
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ecr:*",
+    ]
+
+    resources = ["*"]
+  }
+
+}
+
+resource "aws_iam_role_policy" "docker_ci" {
+  role   = aws_iam_role.docker_ci.name
+  policy = data.aws_iam_policy_document.docker_ci.json
+}
+
+
+resource "aws_codebuild_project" "docker_ci" {
+  name          = "${local.name}-docker"
+  description   = "docker builds"
+  build_timeout = "5"
+  service_role  = aws_iam_role.docker_ci.arn
+
+  artifacts {
+    type = "NO_ARTIFACTS"
+  }
+
+  cache {
+    type = "NO_CACHE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:5.0"
+    type                        = "LINUX_CONTAINER"
+    image_pull_credentials_type = "CODEBUILD"
+    privileged_mode = true
+
+    environment_variable {
+      name  = "REPOSITORY_URL"
+      value = module.ecr.repository_url
+    }
+
+    environment_variable {
+      name  = "DEFAULT_AWS_REGION"
+      value = local.region
+    }
+    environment_variable {
+      name  = "AWS_ACCOUNT_ID"
+      value = local.account_id
+    }
+
+    environment_variable {
+      name = "IMAGE_TAG"
+      value = local.name
+    }
+  }
+
+  source {
+    type            = "GITHUB"
+    location        = "https://github.com/cabinetoffice/co-wagtail-base.git"
+    git_clone_depth = 1
+
+    git_submodules_config {
+      fetch_submodules = true
+    }
+  }
+
+  source_version = "buildspec"
 
   tags = local.tags
 }
