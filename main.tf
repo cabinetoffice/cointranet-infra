@@ -479,7 +479,8 @@ resource "aws_codebuild_project" "docker_ci" {
 
     environment_variable {
       name  = "REPOSITORY_URL"
-      value = module.ecr.repository_url
+      #value = module.ecr.repository_url
+      value = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}"
     }
 
     environment_variable {
@@ -493,7 +494,7 @@ resource "aws_codebuild_project" "docker_ci" {
 
     environment_variable {
       name = "IMAGE_TAG"
-      value = local.name
+      value = "latest"
     }
   }
 
