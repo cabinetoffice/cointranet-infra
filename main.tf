@@ -283,7 +283,7 @@ module "ecr" {
   repository_name = "wagtail"
   repository_type = "private"
 
-  repository_read_write_access_arns = [data.aws_caller_identity.current.arn]
+  repository_read_write_access_arns = [aws_iam_role.docker_ci.arn]
   repository_lifecycle_policy = jsonencode({
     rules = [
       {
