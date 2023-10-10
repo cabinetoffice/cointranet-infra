@@ -449,12 +449,15 @@ data "aws_iam_policy_document" "docker_ci" {
   }
 
 }
+resource "aws_iam_role_policy_attachment" "docker_ci" {
+  role   = aws_iam_role.docker_ci.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+}
 
 resource "aws_iam_role_policy" "docker_ci" {
   role   = aws_iam_role.docker_ci.name
   policy = data.aws_iam_policy_document.docker_ci.json
 }
-
 
 resource "aws_codebuild_project" "docker_ci" {
   name          = "${local.name}-docker"
@@ -480,7 +483,7 @@ resource "aws_codebuild_project" "docker_ci" {
     environment_variable {
       name  = "REPOSITORY_URL"
       #value = module.ecr.repository_url
-      value = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}"
+      value = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/wagtail"
     }
 
     environment_variable {
