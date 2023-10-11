@@ -24,6 +24,8 @@ locals {
   container_name = "wagtail"
   container_port = 80
 
+  codestar = "arn:aws:codestar-connections:eu-west-2:527922690890:connection/d277085d-2da1-4954-9143-93f7db172ea0"
+
   tags = {
     Name       = local.name
   }
@@ -280,7 +282,7 @@ module "vpc" {
 module "ecr" {
   source = "terraform-aws-modules/ecr/aws"
 
-  repository_name = "wagtail"
+  repository_name = local.name
   repository_type = "private"
 
   repository_read_write_access_arns = [aws_iam_role.docker_ci.arn]
@@ -309,6 +311,10 @@ module "ecr" {
 # Continuous integration
 ################################################################################
 
+data "aws_codestarconnections_connection" "co" {
+  arn = local.codestar
+}
+
 data "aws_iam_policy_document" "terraform_assume_role" {
   statement {
     effect = "Allow"
@@ -329,6 +335,12 @@ resource "aws_iam_role" "terraform_ci" {
 
 data "aws_iam_policy_document" "terraform_ci" {
   statement {
+    effect    = "Allow"
+    actions   = ["codestar-connections:UseConnection"]
+    resources = [data.aws_codestarconnections_connection.co.arn]
+  }
+
+  statement {
     effect = "Allow"
 
     actions = [
@@ -348,6 +360,9 @@ data "aws_iam_policy_document" "terraform_ci" {
       "iam:*",
       "logs:*",
       "codebuild:*",
+      "ec2:DescribeVpcs",
+      "ecs:*",
+      "ssm:Get*",
     ]
 
     resources = ["*"] # TODO: lock this down to the bucket that is in use for state
@@ -427,6 +442,12 @@ resource "aws_iam_role" "docker_ci" {
 
 data "aws_iam_policy_document" "docker_ci" {
   statement {
+    effect    = "Allow"
+    actions   = ["codestar-connections:UseConnection"]
+    resources = [data.aws_codestarconnections_connection.co.arn]
+  }
+
+  statement {
     effect = "Allow"
 
     actions = [
@@ -483,7 +504,7 @@ resource "aws_codebuild_project" "docker_ci" {
     environment_variable {
       name  = "REPOSITORY_URL"
       #value = module.ecr.repository_url
-      value = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/wagtail"
+      value = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}"
     }
 
     environment_variable {
