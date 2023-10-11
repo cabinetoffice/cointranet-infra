@@ -422,6 +422,17 @@ resource "aws_codebuild_project" "terraform_ci" {
 }
 
 
+resource "aws_codebuild_webhook" "terraform_ci" {
+  project_name = aws_codebuild_project.terraform_ci.name
+  build_type   = "BUILD"
+  filter_group {
+    filter {
+      type    = "EVENT"
+      pattern = "PUSH"
+    }
+  }
+}
+
 data "aws_iam_policy_document" "docker_assume_role" {
   statement {
     effect = "Allow"
@@ -521,7 +532,7 @@ resource "aws_codebuild_project" "docker_ci" {
       value = "latest"
     }
   }
-
+  
   source {
     type            = "GITHUB"
     location        = "https://github.com/cabinetoffice/co-wagtail-base.git"
@@ -535,4 +546,15 @@ resource "aws_codebuild_project" "docker_ci" {
   source_version = "buildspec"
 
   tags = local.tags
+}
+
+resource "aws_codebuild_webhook" "docker_ci" {
+  project_name = aws_codebuild_project.docker_ci.name
+  build_type   = "BUILD"
+  filter_group {
+    filter {
+      type    = "EVENT"
+      pattern = "PUSH"
+    }
+  }
 }
