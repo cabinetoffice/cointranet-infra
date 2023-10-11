@@ -272,6 +272,7 @@ module "vpc" {
   azs             = local.azs
   private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 4, k)]
   public_subnets  = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 48)]
+  database_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 56)] 
 
   enable_nat_gateway = true
   single_nat_gateway = true
@@ -487,8 +488,8 @@ data "aws_iam_policy_document" "docker_ci" {
 
     resources = ["*"]
   }
-
 }
+
 resource "aws_iam_role_policy_attachment" "docker_ci" {
   role   = aws_iam_role.docker_ci.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
@@ -564,5 +565,85 @@ resource "aws_codebuild_webhook" "docker_ci" {
       type    = "EVENT"
       pattern = "PUSH"
     }
+  }
+}
+
+################################################################################
+# RDS / PostgresQL
+################################################################################
+
+#module "db_sg" {
+#  source  = "terraform-aws-modules/security-group/aws"
+#  version = "~> 5.0"
+#
+#  name        = "${local.name}-db"
+#  description = "db security group"
+#  vpc_id      = module.vpc.vpc_id
+
+#  ingress_rules       = ["postgresql"]
+#  ingress_cidr_blocks = ["10.0.0.0/8"]
+
+#  egress_rules       = ["all-all"]
+#  egress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
+
+#  tags = local.tags
+#}
+
+module "db" {
+  source = "terraform-aws-modules/rds/aws"
+
+  identifier = "rds-${local.name}"
+
+  engine               = "postgres"
+  engine_version       = "14"
+  family               = "postgres14" # DB parameter group
+  major_engine_version = "14"         # DB option group
+  instance_class       = "db.t4g.micro" # TODO: is this correctly sized? 
+
+  allocated_storage     = 20
+  max_allocated_storage = 100
+
+  db_name  = "rds" # TODO: this needs to be unique but can only contain alphanumeric characters
+  username = "dbuser"
+  port     = 5432
+
+  multi_az               = true
+  db_subnet_group_name   = module.vpc.database_subnet_group
+  vpc_security_group_ids = [module.alb_sg.security_group_id]
+
+  maintenance_window              = "Mon:00:00-Mon:03:00"
+  backup_window                   = "03:00-06:00"
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+  create_cloudwatch_log_group     = true
+
+  backup_retention_period = 1
+  skip_final_snapshot     = true
+  deletion_protection     = false
+
+  performance_insights_enabled          = true
+  performance_insights_retention_period = 7
+  create_monitoring_role                = true
+  monitoring_interval                   = 60
+  monitoring_role_name                  = "${local.name}-monitoring"
+  monitoring_role_use_name_prefix       = true
+  monitoring_role_description           = "${local.name} postgres monitoring role"
+
+  parameters = [
+    {
+      name  = "autovacuum"
+      value = 1
+    },
+    {
+      name  = "client_encoding"
+      value = "utf8"
+    }
+  ]
+
+  tags = local.tags
+  db_option_group_tags = {
+    "Sensitive" = "low"
+  }
+  db_parameter_group_tags = {
+    "Sensitive" = "low"
   }
 }
