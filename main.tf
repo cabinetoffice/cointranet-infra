@@ -336,7 +336,11 @@ resource "aws_iam_role" "terraform_ci" {
 data "aws_iam_policy_document" "terraform_ci" {
   statement {
     effect    = "Allow"
-    actions   = ["codestar-connections:UseConnection"]
+    actions   = [
+      "codestar-connections:UseConnection",
+      "codestar-connections:GetConnection",
+      "codestar-connections:ListTagsForResource",
+    ]
     resources = [data.aws_codestarconnections_connection.co.arn]
   }
 
@@ -360,9 +364,13 @@ data "aws_iam_policy_document" "terraform_ci" {
       "iam:*",
       "logs:*",
       "codebuild:*",
-      "ec2:DescribeVpcs",
+      "ec2:Describe*",
       "ecs:*",
+      "ecr:*",
       "ssm:Get*",
+      "autoscaling:*",
+      "elasticloadbalancing:*",
+      "application-autoscaling:*",
     ]
 
     resources = ["*"] # TODO: lock this down to the bucket that is in use for state
