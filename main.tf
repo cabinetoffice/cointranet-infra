@@ -450,7 +450,7 @@ resource "aws_codebuild_project" "terraform_ci" {
 
   vpc_config {
     vpc_id = module.vpc.vpc_id
-    subnets = module.vpc.private_subnets
+    subnets = module.vpc.public_subnets
     security_group_ids = [module.alb_sg.security_group_id]
   }
 
@@ -657,7 +657,7 @@ module "db" {
 
   multi_az               = true
   db_subnet_group_name   = module.vpc.database_subnet_group
-  vpc_security_group_ids = [module.alb_sg.security_group_id]
+  vpc_security_group_ids = [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
 
   maintenance_window              = "Mon:00:00-Mon:03:00"
   backup_window                   = "03:00-06:00"
