@@ -169,22 +169,7 @@ module "alb_sg" {
 
   tags = local.tags
 }
-module "alb_sg" {
-  source  = "terraform-aws-modules/security-group/aws"
-  version = "~> 5.0"
 
-  name        = "${local.name}-service"
-  description = "Service security group"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress_rules       = ["http-80-tcp"]
-  ingress_cidr_blocks = ["0.0.0.0/0"]
-
-  egress_rules       = ["all-all"]
-  egress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
-
-  tags = local.tags
-}
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 8.0"
@@ -629,10 +614,10 @@ module "db_sg" {
   description = "CI security group"
   vpc_id      = module.vpc.vpc_id
 
-  ingress_rules       = ["postgresql"]
+  ingress_rules       = ["postgresql-tcp"]
   ingress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
 
-  egress_rules       = ["postgresql"]
+  egress_rules       = ["postgresql-tcp"]
   egress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
 
   tags = local.tags
