@@ -386,7 +386,7 @@ data "aws_iam_policy_document" "terraform_ci" {
       "iam:*",
       "logs:*",
       "codebuild:*",
-      "ec2:Describe*",
+      "ec2:*",
       "ecs:*",
       "ecr:*",
       "ssm:Get*",
