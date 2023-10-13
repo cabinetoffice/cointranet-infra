@@ -453,7 +453,7 @@ resource "aws_codebuild_project" "terraform_ci" {
 
   vpc_config {
     vpc_id = module.vpc.vpc_id
-    subnets = module.vpc.public_subnets
+    subnets = module.vpc.private_subnets
     security_group_ids = [module.alb_sg.security_group_id]
   }
 
