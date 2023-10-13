@@ -165,7 +165,7 @@ module "alb_sg" {
   ingress_cidr_blocks = ["0.0.0.0/0"]
 
   egress_rules       = ["all-all"]
-  egress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
+  egress_cidr_blocks = module.vpc.public_subnets_cidr_blocks
 
   tags = local.tags
 }
@@ -451,7 +451,7 @@ resource "aws_codebuild_project" "terraform_ci" {
   vpc_config {
     vpc_id = module.vpc.vpc_id
     subnets = module.vpc.private_subnets
-    security_group_ids = [module.db_sg.security_group_id]
+    security_group_ids = [module.autoscaling_sg.security_group_id]
   }
 
   source_version = "main"
@@ -614,11 +614,15 @@ module "db_sg" {
   description = "CI security group"
   vpc_id      = module.vpc.vpc_id
 
-  ingress_rules       = ["postgresql-tcp"]
-  ingress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
+  computed_ingress_with_source_security_group_id = [
+    {
+      rule                     = "postgresql-tcp"
+      source_security_group_id = module.autoscaling_sg.security_group_id
+    }
+  ]
+  number_of_computed_ingress_with_source_security_group_id = 1
 
-  egress_rules       = ["postgresql-tcp"]
-  egress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
+  egress_rules       = ["all-all"]
 
   tags = local.tags
 }
