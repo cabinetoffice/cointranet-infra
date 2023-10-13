@@ -1,7 +1,3 @@
-provider "aws" {
-  region = local.region
-}
-
 terraform {
   backend "s3" {
     bucket = "co-digital-proof-of-concepts-tfstate"
@@ -10,12 +6,37 @@ terraform {
   }
 }
 
+provider "postgresql" {
+  host     = null_resource.postgres.triggers.host
+  port     = null_resource.postgres.triggers.port
+  username = null_resource.postgres.triggers.username
+  password = data.aws_secretsmanager_secret_version.postgres_password.secret_string
+  sslmode  = "require"
+}
+
+provider "aws" {
+  region = local.region
+}
+
+# This null resource and  are required due to https://github.com/hashicorp/terraform-provider-postgresql/issues/2
+resource "null_resource" "postgres" {
+  triggers = {
+    host     = module.db.db_instance_address
+    port     = module.db.db_instance_port
+    username = module.db.db_instance_username
+  }
+}
+
+
 data "aws_availability_zones" "available" {}
 data "aws_caller_identity" "current" {}
+data "aws_secretsmanager_secret_version" "postgres_password" {
+  secret_id = module.db.db_instance_master_user_secret_arn
+}
 
 locals {
-  region = "eu-west-2"
-  name   = "${basename(path.cwd)}"
+  region     = "eu-west-2"
+  name       = basename(path.cwd)
   account_id = data.aws_caller_identity.current.account_id
 
   vpc_cidr = "10.0.0.0/16" # TODO: do we definitely need these to be unique?
@@ -27,7 +48,7 @@ locals {
   codestar = "arn:aws:codestar-connections:eu-west-2:527922690890:connection/d277085d-2da1-4954-9143-93f7db172ea0"
 
   tags = {
-    Name       = local.name
+    Name = local.name
   }
 }
 
@@ -42,7 +63,7 @@ module "ecs_cluster" {
 
   default_capacity_provider_use_fargate = false
   autoscaling_capacity_providers = {
-   intranet  = {
+    intranet = {
       auto_scaling_group_arn         = module.autoscaling["intranet"].autoscaling_group_arn
       managed_termination_protection = "ENABLED"
 
@@ -171,7 +192,7 @@ module "alb" {
 
   target_groups = [
     {
-      name             = substr("${local.name}-${local.container_name}",0,32)
+      name             = substr("${local.name}-${local.container_name}", 0, 32)
       backend_protocol = "HTTP"
       backend_port     = local.container_port
       target_type      = "ip"
@@ -269,10 +290,10 @@ module "vpc" {
   name = local.name
   cidr = local.vpc_cidr
 
-  azs             = local.azs
-  private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 4, k)]
-  public_subnets  = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 48)]
-  database_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 56)] 
+  azs              = local.azs
+  private_subnets  = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 4, k)]
+  public_subnets   = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 48)]
+  database_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 56)]
 
   enable_nat_gateway = true
   single_nat_gateway = true
@@ -336,8 +357,8 @@ resource "aws_iam_role" "terraform_ci" {
 
 data "aws_iam_policy_document" "terraform_ci" {
   statement {
-    effect    = "Allow"
-    actions   = [
+    effect = "Allow"
+    actions = [
       "codestar-connections:UseConnection",
       "codestar-connections:GetConnection",
       "codestar-connections:ListTagsForResource",
@@ -356,7 +377,7 @@ data "aws_iam_policy_document" "terraform_ci" {
 
     resources = ["*"]
   }
-  
+
   statement {
     effect = "Allow"
 
@@ -478,7 +499,7 @@ data "aws_iam_policy_document" "docker_ci" {
 
     resources = ["*"]
   }
-  
+
   statement {
     effect = "Allow"
 
@@ -491,7 +512,7 @@ data "aws_iam_policy_document" "docker_ci" {
 }
 
 resource "aws_iam_role_policy_attachment" "docker_ci" {
-  role   = aws_iam_role.docker_ci.name
+  role       = aws_iam_role.docker_ci.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
 }
 
@@ -519,10 +540,15 @@ resource "aws_codebuild_project" "docker_ci" {
     image                       = "aws/codebuild/standard:5.0"
     type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
-    privileged_mode = true
+    privileged_mode             = true
+
+    #      DJANGO_SECRET_KEY: changeme
+    #      DATABASE_URL: postgres://app_user:changeme@db/app_db
+    #      REDIS_URL: redis://redis
+    #      DJANGO_SETTINGS_MODULE: cointranet.settings.dev
 
     environment_variable {
-      name  = "REPOSITORY_URL"
+      name = "REPOSITORY_URL"
       #value = module.ecr.repository_url
       value = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}"
     }
@@ -537,11 +563,11 @@ resource "aws_codebuild_project" "docker_ci" {
     }
 
     environment_variable {
-      name = "IMAGE_TAG"
+      name  = "IMAGE_TAG"
       value = "latest"
     }
   }
-  
+
   source {
     type            = "GITHUB"
     location        = "https://github.com/cabinetoffice/co-wagtail-base.git"
@@ -589,6 +615,19 @@ resource "aws_codebuild_webhook" "docker_ci" {
 #  tags = local.tags
 #}
 
+#resource "aws_iam_role_policy_attachment" "postgres_iam" {
+#  role   = module.ecs.task_exec_iam_role_arn
+#  policy_arn = "arn:aws:iam::aws:policy/"
+#}
+
+resource "postgresql_role" "application_role" {
+  name               = "dev_appuser"
+  login              = true
+  password           = "myappuserpassword"
+  encrypted_password = true
+  depends_on         = [module.db]
+}
+
 module "db" {
   source = "terraform-aws-modules/rds/aws"
 
@@ -596,16 +635,17 @@ module "db" {
 
   engine               = "postgres"
   engine_version       = "14"
-  family               = "postgres14" # DB parameter group
-  major_engine_version = "14"         # DB option group
+  family               = "postgres14"   # DB parameter group
+  major_engine_version = "14"           # DB option group
   instance_class       = "db.t4g.micro" # TODO: is this correctly sized? 
 
   allocated_storage     = 20
   max_allocated_storage = 100
 
-  db_name  = "rds" # TODO: this needs to be unique but can only contain alphanumeric characters
-  username = "dbuser"
-  port     = 5432
+  db_name                     = "wagtail" # TODO: this needs to be unique but can only contain alphanumeric characters
+  username                    = "admin_user"
+  manage_master_user_password = true
+  port                        = 5432
 
   multi_az               = true
   db_subnet_group_name   = module.vpc.database_subnet_group
