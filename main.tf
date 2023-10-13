@@ -169,7 +169,22 @@ module "alb_sg" {
 
   tags = local.tags
 }
+module "alb_sg" {
+  source  = "terraform-aws-modules/security-group/aws"
+  version = "~> 5.0"
 
+  name        = "${local.name}-service"
+  description = "Service security group"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules       = ["http-80-tcp"]
+  ingress_cidr_blocks = ["0.0.0.0/0"]
+
+  egress_rules       = ["all-all"]
+  egress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
+
+  tags = local.tags
+}
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 8.0"
@@ -297,9 +312,6 @@ module "vpc" {
 
   enable_nat_gateway = true
   single_nat_gateway = true
-
-  create_database_subnet_group           = true
-  create_database_subnet_route_table     = true
 
   tags = local.tags
 }
@@ -454,7 +466,7 @@ resource "aws_codebuild_project" "terraform_ci" {
   vpc_config {
     vpc_id = module.vpc.vpc_id
     subnets = module.vpc.private_subnets
-    security_group_ids = [module.alb_sg.security_group_id]
+    security_group_ids = [module.db_sg.security_group_id]
   }
 
   source_version = "main"
@@ -609,22 +621,22 @@ resource "aws_codebuild_webhook" "docker_ci" {
 # RDS / PostgresQL
 ################################################################################
 
-#module "db_sg" {
-#  source  = "terraform-aws-modules/security-group/aws"
-#  version = "~> 5.0"
-#
-#  name        = "${local.name}-db"
-#  description = "db security group"
-#  vpc_id      = module.vpc.vpc_id
+module "db_sg" {
+  source  = "terraform-aws-modules/security-group/aws"
+  version = "~> 5.0"
 
-#  ingress_rules       = ["postgresql"]
-#  ingress_cidr_blocks = ["10.0.0.0/8"]
+  name        = "${local.name}-ci"
+  description = "CI security group"
+  vpc_id      = module.vpc.vpc_id
 
-#  egress_rules       = ["all-all"]
-#  egress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
+  ingress_rules       = ["postgresql"]
+  ingress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
 
-#  tags = local.tags
-#}
+  egress_rules       = ["postgresql"]
+  egress_cidr_blocks = module.vpc.private_subnets_cidr_blocks
+
+  tags = local.tags
+}
 
 #resource "aws_iam_role_policy_attachment" "postgres_iam" {
 #  role   = module.ecs.task_exec_iam_role_arn
@@ -660,7 +672,7 @@ module "db" {
 
   multi_az               = true
   db_subnet_group_name   = module.vpc.database_subnet_group
-  vpc_security_group_ids = [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
+  vpc_security_group_ids = [module.db_sg.security_group_id] # [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
 
   maintenance_window              = "Mon:00:00-Mon:03:00"
   backup_window                   = "03:00-06:00"
