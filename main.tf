@@ -11,6 +11,7 @@ provider "postgresql" {
   port     = null_resource.postgres.triggers.port
   username = null_resource.postgres.triggers.username
   password = data.aws_secretsmanager_secret_version.postgres_password.secret_string
+  database = "wagtail"
   sslmode  = "require"
 }
 
@@ -105,7 +106,7 @@ module "ecs_service" {
   # Container definition(s)
   container_definitions = {
     (local.container_name) = {
-      image = "public.ecr.aws/ecs-sample-image/amazon-ecs-sample:latest" # TODO: use a real image!
+      image = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}" # TODO: use a real image!
       port_mappings = [
         {
           name          = local.container_name
@@ -114,7 +115,7 @@ module "ecs_service" {
         }
       ]
 
-      entry_point = ["/usr/sbin/apache2", "-D", "FOREGROUND"] # TODO: use wagtail!
+      #entry_point = ["/usr/sbin/apache2", "-D", "FOREGROUND"] # TODO: use wagtail!
 
       # Example image used requires access to write to root filesystem
       readonly_root_filesystem = false
@@ -557,7 +558,6 @@ resource "aws_codebuild_project" "docker_ci" {
 
     environment_variable {
       name = "REPOSITORY_URL"
-      #value = module.ecr.repository_url
       value = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}"
     }
 
@@ -611,7 +611,7 @@ module "db_sg" {
   version = "~> 5.0"
 
   name        = "${local.name}-ci"
-  description = "CI security group"
+  description = "DB security group"
   vpc_id      = module.vpc.vpc_id
 
   computed_ingress_with_source_security_group_id = [
