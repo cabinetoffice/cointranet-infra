@@ -307,6 +307,7 @@ module "ecr" {
 
   repository_name = local.name
   repository_type = "private"
+  repository_image_tag_mutability = "MUTABLE"
 
   repository_read_write_access_arns = [aws_iam_role.docker_ci.arn]
   repository_lifecycle_policy = jsonencode({
