@@ -651,7 +651,12 @@ module "db_sg" {
   computed_ingress_with_source_security_group_id = [
     {
       rule                     = "postgresql-tcp"
-      source_security_group_id = module.autoscaling_sg.security_group_id
+      source_security_group_id = module.autoscaling_sg.security_group_id # TODO: this is CI, make a dedicated sg
+    },
+    { 
+      rule = "postgresql-tcp"
+      source_security_group_id = module.ecs_service.security_group_id # wagtail
+
     }
   ]
   number_of_computed_ingress_with_source_security_group_id = 1
