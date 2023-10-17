@@ -59,7 +59,7 @@ locals {
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 
   container_name = "wagtail"
-  container_port = 80
+  container_port = 8000
 
   codestar = "arn:aws:codestar-connections:eu-west-2:527922690890:connection/d277085d-2da1-4954-9143-93f7db172ea0"
 
