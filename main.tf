@@ -147,7 +147,7 @@ module "ecs_service" {
       ]
 
       #entry_point = ["/usr/sbin/apache2", "-D", "FOREGROUND"] # TODO: use wagtail!
-      entry_point = ["python", "manage.py", "migrate", "&&", "python", "manage.py", "runserver"]
+      entry_point = ["python", "manage.py", "runserver"]
       # Example image used requires access to write to root filesystem
       readonly_root_filesystem = false
     }
