@@ -658,7 +658,7 @@ module "db_sg" {
       source_security_group_id = module.ecs_service.security_group_id # wagtail
     }
   ]
-  number_of_computed_ingress_with_source_security_group_id = 1
+  number_of_computed_ingress_with_source_security_group_id = 2
 
   egress_rules = ["all-all"]
 
