@@ -171,8 +171,6 @@ module "ecs_service" {
     }
   }
 
-  network_configuration {}
-
   tags = local.tags
 }
 
