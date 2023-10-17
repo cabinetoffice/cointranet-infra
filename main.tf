@@ -160,7 +160,6 @@ module "ecs_service" {
   }
 
   subnet_ids = module.vpc.private_subnets
-  security_group_ids = module.autoscaling_sg.security_group_ids # TODO: rework security groups and names
   security_group_rules = {
     alb_http_ingress = {
       type                     = "ingress"
@@ -169,6 +168,14 @@ module "ecs_service" {
       protocol                 = "tcp"
       description              = "Service port"
       source_security_group_id = module.alb_sg.security_group_id
+    }
+    db_egress = {
+      type                     = "egress"
+      from_port                = 5432
+      to_port                  = 5432
+      protocol                 = "tcp"
+      description              = "PostgresQL port"
+      source_security_group_id = module.autoscaling_sg.security_group_id
     }
   }
 
