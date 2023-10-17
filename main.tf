@@ -635,10 +635,15 @@ module "db_sg" {
 #  policy_arn = "arn:aws:iam::aws:policy/"
 #}
 
+resource "random_password" "application_password" {
+	length = 32
+	special = true
+}
+
 resource "postgresql_role" "application_role" {
-  name               = "dev_appuser"
+  name               = "wagtail"
   login              = true
-  password           = "myappuserpassword"
+  password           = random_password.application_password.result
   encrypted_password = true
   depends_on         = [module.db]
 }
