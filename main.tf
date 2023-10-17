@@ -142,7 +142,7 @@ module "ecs_service" {
         {
           name  = "DATABASE_URL",
 #          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
-          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}/wagtail"
+          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.endpoint}/swagtail"
         }
       ]
 
@@ -175,8 +175,8 @@ module "ecs_service" {
       type        = "egress"
       from_port   = 5432
       to_port     = 5432
-      protocol    = "-1"
-      cidr_blocks = ["0.0.0.0/0"]
+      protocol    = "tcp"
+      cidr_blocks = module.vpc.database_subnets # TODO: pick right subnets
     }
   }
 
@@ -656,7 +656,6 @@ module "db_sg" {
     { 
       rule = "postgresql-tcp"
       source_security_group_id = module.ecs_service.security_group_id # wagtail
-
     }
   ]
   number_of_computed_ingress_with_source_security_group_id = 1
@@ -700,7 +699,7 @@ module "db" {
 
   multi_az               = true
   db_subnet_group_name   = module.vpc.database_subnet_group
-  vpc_security_group_ids = [module.db_sg.security_group_id, module.ecs_service.security_group_id] # [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
+  vpc_security_group_ids = [module.db_sg.security_group_id] # [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
 
   maintenance_window              = "Mon:00:00-Mon:03:00"
   backup_window                   = "03:00-06:00"
