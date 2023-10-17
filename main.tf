@@ -142,7 +142,7 @@ module "ecs_service" {
         {
           name  = "DATABASE_URL",
 #          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
-          value = "postgres://wagtail:${random_password.application_password.result}@${null_resource.postgres.triggers.endpoint}/swagtail"
+          value = "postgres://wagtail:${random_password.application_password.result}@${null_resource.postgres.triggers.endpoint}/wagtail"
         }
       ]
 
