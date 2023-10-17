@@ -169,15 +169,9 @@ module "ecs_service" {
       description              = "Service port"
       source_security_group_id = module.alb_sg.security_group_id
     }
-    db_egress = {
-      type                     = "egress"
-      from_port                = 5432
-      to_port                  = 5432
-      protocol                 = "tcp"
-      description              = "PostgresQL port"
-      source_security_group_id = module.autoscaling_sg.security_group_id
-    }
   }
+
+  network_configuration {}
 
   tags = local.tags
 }
@@ -694,7 +688,7 @@ module "db" {
 
   multi_az               = true
   db_subnet_group_name   = module.vpc.database_subnet_group
-  vpc_security_group_ids = [module.db_sg.security_group_id] # [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
+  vpc_security_group_ids = [module.db_sg.security_group_id, module.ecs_service.security_group_id] # [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
 
   maintenance_window              = "Mon:00:00-Mon:03:00"
   backup_window                   = "03:00-06:00"
