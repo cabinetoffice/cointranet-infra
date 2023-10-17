@@ -1,3 +1,7 @@
+#
+# Miscellaneous resources and settings
+#
+
 terraform {
   backend "s3" {
     bucket = "co-digital-proof-of-concepts-tfstate"
@@ -30,6 +34,15 @@ resource "null_resource" "postgres" {
   }
 }
 
+resource "random_password" "django_secret_key" {
+	length = 128
+	special = false
+}
+
+resource "random_password" "application_password" {
+	length = 32
+	special = true
+}
 
 data "aws_availability_zones" "available" {}
 data "aws_caller_identity" "current" {}
@@ -554,10 +567,25 @@ resource "aws_codebuild_project" "docker_ci" {
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = true
 
-    #      DJANGO_SECRET_KEY: changeme
-    #      DATABASE_URL: postgres://app_user:changeme@db/app_db
-    #      REDIS_URL: redis://redis
-    #      DJANGO_SETTINGS_MODULE: cointranet.settings.dev
+    environment_variable {
+      name = "DATABASE_URL"
+      value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
+    }
+
+#    environment_variable {
+#      name = "REDIS_URL"
+#      value = 
+#    }
+
+    environment_variable {
+      name = "DJANGO_SECRET_KEY"
+      value = random_password.django_secret_key.result
+    }
+
+    environment_variable {
+      name = "DJANGO_SETTINGS_MODULE"
+      value = "cointranet.settings.dev"
+    }
 
     environment_variable {
       name = "REPOSITORY_URL"
@@ -634,11 +662,6 @@ module "db_sg" {
 #  role   = module.ecs.task_exec_iam_role_arn
 #  policy_arn = "arn:aws:iam::aws:policy/"
 #}
-
-resource "random_password" "application_password" {
-	length = 32
-	special = true
-}
 
 resource "postgresql_role" "application_role" {
   name               = "wagtail"
