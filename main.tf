@@ -160,6 +160,7 @@ module "ecs_service" {
   }
 
   subnet_ids = module.vpc.private_subnets
+  security_group_ids = module.autoscaling_sg.security_group_ids # TODO: rework security groups and names
   security_group_rules = {
     alb_http_ingress = {
       type                     = "ingress"
