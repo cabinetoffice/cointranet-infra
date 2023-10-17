@@ -130,6 +130,12 @@ module "ecs_service" {
         }
       ]
 
+      environment = {
+      	DJANGO_SECRET_KEY = random_password.django_secret_key.result
+      	DJANGO_SETTINGS_MODULE = "cointranet.settings.dev"
+      	DATABASE_URL = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
+      } 
+
       #entry_point = ["/usr/sbin/apache2", "-D", "FOREGROUND"] # TODO: use wagtail!
 
       # Example image used requires access to write to root filesystem
@@ -566,26 +572,6 @@ resource "aws_codebuild_project" "docker_ci" {
     type                        = "LINUX_CONTAINER"
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = true
-
-    environment_variable {
-      name = "DATABASE_URL"
-      value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
-    }
-
-#    environment_variable {
-#      name = "REDIS_URL"
-#      value = 
-#    }
-
-    environment_variable {
-      name = "DJANGO_SECRET_KEY"
-      value = random_password.django_secret_key.result
-    }
-
-    environment_variable {
-      name = "DJANGO_SETTINGS_MODULE"
-      value = "cointranet.settings.dev"
-    }
 
     environment_variable {
       name = "REPOSITORY_URL"
