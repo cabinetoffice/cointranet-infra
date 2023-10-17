@@ -136,6 +136,10 @@ module "ecs_service" {
         value = random_password.django_secret_key.result
         },
         {
+        	name = "DJANGO_LOG_LEVEL",
+        	value = "DEBUG"
+        },
+        {
           name  = "DJANGO_SETTINGS_MODULE",
           value = "cointranet.settings.dev"
         },
