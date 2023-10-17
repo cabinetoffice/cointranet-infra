@@ -11,7 +11,7 @@ provider "postgresql" {
   port     = null_resource.postgres.triggers.port
   username = null_resource.postgres.triggers.username
   password = null_resource.postgres.triggers.password
-  superuser = true
+  superuser = false
   database = "wagtail"
   sslmode  = "require"
 }
