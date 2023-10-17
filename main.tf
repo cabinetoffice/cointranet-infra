@@ -40,8 +40,8 @@ resource "random_password" "django_secret_key" {
 }
 
 resource "random_password" "application_password" {
-  length  = 32
-  special = true
+  length  = 64
+  special = false
 }
 
 data "aws_availability_zones" "available" {}
