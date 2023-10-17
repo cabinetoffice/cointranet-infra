@@ -11,13 +11,13 @@ terraform {
 }
 
 provider "postgresql" {
-  host     = null_resource.postgres.triggers.host
-  port     = null_resource.postgres.triggers.port
-  username = null_resource.postgres.triggers.username
-  password = null_resource.postgres.triggers.password
+  host      = null_resource.postgres.triggers.host
+  port      = null_resource.postgres.triggers.port
+  username  = null_resource.postgres.triggers.username
+  password  = null_resource.postgres.triggers.password
   superuser = false
-  database = "wagtail"
-  sslmode  = "require"
+  database  = "wagtail"
+  sslmode   = "require"
 }
 
 provider "aws" {
@@ -35,13 +35,13 @@ resource "null_resource" "postgres" {
 }
 
 resource "random_password" "django_secret_key" {
-	length = 128
-	special = false
+  length  = 128
+  special = false
 }
 
 resource "random_password" "application_password" {
-	length = 32
-	special = true
+  length  = 32
+  special = true
 }
 
 data "aws_availability_zones" "available" {}
@@ -131,17 +131,17 @@ module "ecs_service" {
       ]
 
       environment = [{
-      	name = "DJANGO_SECRET_KEY",
-      	value = random_password.django_secret_key.result
-      },
-      {
-        name = "DJANGO_SETTINGS_MODULE", 
-        value = "cointranet.settings.dev"
-      },
-      {
-        name = "DATABASE_URL",
-        value =  "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
-      }
+        name  = "DJANGO_SECRET_KEY",
+        value = random_password.django_secret_key.result
+        },
+        {
+          name  = "DJANGO_SETTINGS_MODULE",
+          value = "cointranet.settings.dev"
+        },
+        {
+          name  = "DATABASE_URL",
+          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
+        }
       ]
 
       #entry_point = ["/usr/sbin/apache2", "-D", "FOREGROUND"] # TODO: use wagtail!
@@ -334,8 +334,8 @@ module "vpc" {
 module "ecr" {
   source = "terraform-aws-modules/ecr/aws"
 
-  repository_name = local.name
-  repository_type = "private"
+  repository_name                 = local.name
+  repository_type                 = "private"
   repository_image_tag_mutability = "MUTABLE"
 
   repository_read_write_access_arns = [aws_iam_role.docker_ci.arn]
@@ -480,8 +480,8 @@ resource "aws_codebuild_project" "terraform_ci" {
   }
 
   vpc_config {
-    vpc_id = module.vpc.vpc_id
-    subnets = module.vpc.private_subnets
+    vpc_id             = module.vpc.vpc_id
+    subnets            = module.vpc.private_subnets
     security_group_ids = [module.autoscaling_sg.security_group_id]
   }
 
@@ -582,7 +582,7 @@ resource "aws_codebuild_project" "docker_ci" {
     privileged_mode             = true
 
     environment_variable {
-      name = "REPOSITORY_URL"
+      name  = "REPOSITORY_URL"
       value = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}"
     }
 
@@ -647,7 +647,7 @@ module "db_sg" {
   ]
   number_of_computed_ingress_with_source_security_group_id = 1
 
-  egress_rules       = ["all-all"]
+  egress_rules = ["all-all"]
 
   tags = local.tags
 }
