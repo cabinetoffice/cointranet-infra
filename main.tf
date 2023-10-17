@@ -10,7 +10,7 @@ provider "postgresql" {
   host     = null_resource.postgres.triggers.host
   port     = null_resource.postgres.triggers.port
   username = null_resource.postgres.triggers.username
-  password = data.aws_secretsmanager_secret_version.postgres_password.secret_string
+  password = null_resource.postgres.triggers.password
   database = "wagtail"
   sslmode  = "require"
 }
@@ -25,6 +25,7 @@ resource "null_resource" "postgres" {
     host     = module.db.db_instance_address
     port     = module.db.db_instance_port
     username = module.db.db_instance_username
+    password = data.aws_secretsmanager_secret_version.postgres_password.secret_string
   }
 }
 
