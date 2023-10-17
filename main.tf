@@ -141,13 +141,10 @@ module "ecs_service" {
         },
         {
           name  = "DATABASE_URL",
-#          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
           value = "postgres://wagtail:${random_password.application_password.result}@${null_resource.postgres.triggers.endpoint}/wagtail"
         }
       ]
 
-      #entry_point = ["/usr/sbin/apache2", "-D", "FOREGROUND"] # TODO: use wagtail!
-      entry_point = ["python", "manage.py", "runserver"]
       # Example image used requires access to write to root filesystem
       readonly_root_filesystem = false
     }
