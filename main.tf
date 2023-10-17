@@ -12,7 +12,7 @@ terraform {
 
 provider "postgresql" {
   host      = null_resource.postgres.triggers.host
-#  port      = null_resource.postgres.triggers.port
+  port      = null_resource.postgres.triggers.port
   username  = null_resource.postgres.triggers.username
   password  = null_resource.postgres.triggers.password
   superuser = false
@@ -27,8 +27,9 @@ provider "aws" {
 # This null resource and  are required due to https://github.com/hashicorp/terraform-provider-postgresql/issues/2
 resource "null_resource" "postgres" {
   triggers = {
-    host     = module.db.db_instance_endpoint
+    host     = module.db.db_instance_address
     port     = module.db.db_instance_port
+    endpoint = module.db.db_instance_endpoint
     username = module.db.db_instance_username
     password = jsondecode(data.aws_secretsmanager_secret_version.postgres_password.secret_string)["password"]
   }
