@@ -169,6 +169,13 @@ module "ecs_service" {
       description              = "Service port"
       source_security_group_id = module.alb_sg.security_group_id
     }
+    db_egress_all = {
+      type        = "egress"
+      from_port   = 5432
+      to_port     = 5432
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
   }
 
   tags = local.tags
@@ -179,7 +186,7 @@ module "ecs_service" {
 ################################################################################
 
 # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html#ecs-optimized-ami-linux
-data "aws_ssm_parameter" "ecs_optimized_ami" {
+qqdata "aws_ssm_parameter" "ecs_optimized_ami" {
   name = "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended"
 }
 
