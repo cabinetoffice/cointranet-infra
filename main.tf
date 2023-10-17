@@ -12,7 +12,7 @@ terraform {
 
 provider "postgresql" {
   host      = null_resource.postgres.triggers.host
-  port      = null_resource.postgres.triggers.port
+#  port      = null_resource.postgres.triggers.port
   username  = null_resource.postgres.triggers.username
   password  = null_resource.postgres.triggers.password
   superuser = false
@@ -140,7 +140,8 @@ module "ecs_service" {
         },
         {
           name  = "DATABASE_URL",
-          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
+#          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}:${null_resource.postgres.triggers.port}/wagtail"
+          value = "postgres://admin_user:${random_password.application_password.result}@${null_resource.postgres.triggers.host}/wagtail"
         }
       ]
 
