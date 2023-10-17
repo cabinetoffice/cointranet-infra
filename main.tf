@@ -60,7 +60,7 @@ locals {
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 
   container_name = "wagtail"
-  container_port = 8000
+  container_port = 8080
 
   codestar = "arn:aws:codestar-connections:eu-west-2:527922690890:connection/d277085d-2da1-4954-9143-93f7db172ea0"
 
@@ -220,7 +220,7 @@ module "alb" {
 
   vpc_id          = module.vpc.vpc_id
   subnets         = module.vpc.public_subnets
-  security_groups = [module.alb_sg.security_group_id]
+  security_groups = [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
 
   http_tcp_listeners = [
     {
@@ -314,9 +314,13 @@ module "autoscaling_sg" {
     {
       rule                     = "http-80-tcp"
       source_security_group_id = module.alb_sg.security_group_id
+    },
+    {
+      rule                     = "http-8080-tcp"
+      source_security_group_id = module.alb_sg.security_group_id
     }
   ]
-  number_of_computed_ingress_with_source_security_group_id = 1
+  number_of_computed_ingress_with_source_security_group_id = 2
 
   egress_rules = ["all-all"]
 
