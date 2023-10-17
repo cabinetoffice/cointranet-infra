@@ -27,7 +27,7 @@ provider "aws" {
 # This null resource and  are required due to https://github.com/hashicorp/terraform-provider-postgresql/issues/2
 resource "null_resource" "postgres" {
   triggers = {
-    host     = module.db.db_instance_address
+    host     = module.db.db_instance_endpoint
     port     = module.db.db_instance_port
     username = module.db.db_instance_username
     password = jsondecode(data.aws_secretsmanager_secret_version.postgres_password.secret_string)["password"]
