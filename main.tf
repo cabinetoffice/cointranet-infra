@@ -121,6 +121,20 @@ module "ecs_service" {
 
   # Container definition(s)
   container_definitions = {
+    "nginx" = {
+      image = "gallery.ecr.aws/docker/library/nginx" 
+      port_mappings = [
+        {
+          name          = "nginx"
+          containerPort = 80
+          protocol      = "tcp"
+        }
+      ]
+
+      environment = [{}]
+      # Example image used requires access to write to root filesystem
+      readonly_root_filesystem = false
+    }
     (local.container_name) = {
       image = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}" # TODO: use a real image!
       port_mappings = [
@@ -620,7 +634,7 @@ resource "aws_codebuild_project" "docker_ci" {
     }
   }
 
-  source_version = "buildspec"
+  source_version = "main"
 
   tags = local.tags
 }
