@@ -121,6 +121,14 @@ module "ecs_service" {
 
   # Container definition(s)
   container_definitions = {
+      "nginx" = {
+    	image = ""
+    	port_mappings = [
+          name          = "${local.container_name}-proxy"
+          containerPort = 80
+          protocol      = "tcp"    		
+    	]
+    }
     (local.container_name) = {
       image = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}" # TODO: use a real image!
       port_mappings = [
@@ -220,7 +228,7 @@ module "alb" {
 
   http_tcp_listeners = [
     {
-      port               = local.container_port
+      port               = 80
       protocol           = "HTTP"
       target_group_index = 0
     },
