@@ -176,7 +176,7 @@ module "ecs_service" {
       from_port   = 5432
       to_port     = 5432
       protocol    = "tcp"
-      cidr_blocks = module.vpc.database_subnets # TODO: pick right subnets
+      cidr_blocks = module.vpc.database_subnets_cidr_blocks # TODO: pick right subnets
     }
   }
 
