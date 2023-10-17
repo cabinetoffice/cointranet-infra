@@ -25,7 +25,7 @@ resource "null_resource" "postgres" {
     host     = module.db.db_instance_address
     port     = module.db.db_instance_port
     username = module.db.db_instance_username
-    password = data.aws_secretsmanager_secret_version.postgres_password.secret_string
+    password = jsondecode(data.aws_secretsmanager_secret_version.postgres_password.secret_string)["password"]
   }
 }
 
