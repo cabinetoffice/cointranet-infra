@@ -52,6 +52,8 @@ data "aws_secretsmanager_secret_version" "postgres_password" {
 }
 
 locals {
+  admin_email = "co-intranet-project@cabinetoffice.gov.uk"
+
   region     = "eu-west-2"
   name       = basename(path.cwd)
   account_id = data.aws_caller_identity.current.account_id
@@ -146,6 +148,10 @@ module "ecs_service" {
         {
           name  = "DATABASE_URL",
           value = "postgres://wagtail:${random_password.application_password.result}@${null_resource.postgres.triggers.endpoint}/wagtail"
+        },
+        {
+        	name = "ADMIN_EMAIL",
+        	value = local.admin_email
         }
       ]
 
