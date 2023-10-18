@@ -138,8 +138,8 @@ module "ecs_service" {
         value = random_password.django_secret_key.result
         },
         {
-        	name = "DJANGO_LOG_LEVEL",
-        	value = "DEBUG"
+          name  = "DJANGO_LOG_LEVEL",
+          value = "DEBUG"
         },
         {
           name  = "DJANGO_SETTINGS_MODULE",
@@ -150,8 +150,8 @@ module "ecs_service" {
           value = "postgres://wagtail:${random_password.application_password.result}@${null_resource.postgres.triggers.endpoint}/wagtail"
         },
         {
-        	name = "ADMIN_EMAIL",
-        	value = local.admin_email
+          name  = "ADMIN_EMAIL",
+          value = local.admin_email
         }
       ]
 
@@ -226,7 +226,7 @@ module "alb" {
 
   vpc_id          = module.vpc.vpc_id
   subnets         = module.vpc.public_subnets
-  security_groups = [module.alb_sg.security_group_id,module.autoscaling_sg.security_group_id]
+  security_groups = [module.alb_sg.security_group_id, module.autoscaling_sg.security_group_id]
 
   http_tcp_listeners = [
     {
@@ -664,8 +664,8 @@ module "db_sg" {
       rule                     = "postgresql-tcp"
       source_security_group_id = module.autoscaling_sg.security_group_id # TODO: this is CI, make a dedicated sg
     },
-    { 
-      rule = "postgresql-tcp"
+    {
+      rule                     = "postgresql-tcp"
       source_security_group_id = module.ecs_service.security_group_id # wagtail
     }
   ]
