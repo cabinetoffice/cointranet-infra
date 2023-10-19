@@ -45,6 +45,11 @@ resource "random_password" "application_password" {
   special = false
 }
 
+resource "random_password" "admin_password" { # TODO: turn this into a user configurable secret and read it from AWS directly
+  length  = 64
+  special = false
+}
+
 data "aws_availability_zones" "available" {}
 data "aws_caller_identity" "current" {}
 data "aws_secretsmanager_secret_version" "postgres_password" {
@@ -152,6 +157,11 @@ module "ecs_service" {
         {
           name  = "ADMIN_EMAIL",
           value = local.admin_email
+        },
+        { 
+          name = "ADMIN_PASSWORD",
+          value = random_password.admin_password.result
+
         }
       ]
 
