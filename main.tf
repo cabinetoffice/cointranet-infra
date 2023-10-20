@@ -151,6 +151,10 @@ module "ecs_service" {
           value = "cointranet.settings.dev"
         },
         {
+          name = "WAGTAILADMIN_BASE_URL",
+          value = "wagtail-poc.codatt.net"
+        },
+        {
           name  = "DATABASE_URL",
           value = "postgres://wagtail:${random_password.application_password.result}@${null_resource.postgres.triggers.endpoint}/wagtail"
         },
