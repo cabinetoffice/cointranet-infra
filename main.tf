@@ -148,7 +148,7 @@ module "ecs_service" {
         },
         {
           name  = "DJANGO_SETTINGS_MODULE",
-          value = "cointranet.settings.dev"
+          value = "cointranet.settings.devdebugoff"
         },
         {
           name = "WAGTAILADMIN_BASE_URL",
