@@ -85,7 +85,7 @@ module "ecs_cluster" {
 
   cluster_name = local.name
 
-  default_capacity_provider_use_fargate = true
+  default_capacity_provider_use_fargate = false
 
 #  fargate_capacity_providers = {
 #    FARGATE = {
