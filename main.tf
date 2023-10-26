@@ -85,21 +85,30 @@ module "ecs_cluster" {
 
   cluster_name = local.name
 
-  default_capacity_provider_use_fargate = false
-  autoscaling_capacity_providers = {
-    intranet = {
-      auto_scaling_group_arn         = module.autoscaling["intranet"].autoscaling_group_arn
-      managed_termination_protection = "ENABLED"
+  default_capacity_provider_use_fargate = true
 
-      managed_scaling = {
-        maximum_scaling_step_size = 5
-        minimum_scaling_step_size = 1
-        status                    = "ENABLED"
-        target_capacity           = 2
+  fargate_capacity_providers = {
+    FARGATE = {
+      default_capacity_provider_strategy = {
+        weight = 50
       }
-
     }
   }
+
+  #  autoscaling_capacity_providers = {
+  #    intranet = {
+  #      auto_scaling_group_arn         = module.autoscaling["intranet"].autoscaling_group_arn
+  #      managed_termination_protection = "ENABLED"
+  #
+  #      managed_scaling = {
+  #        maximum_scaling_step_size = 5
+  #        minimum_scaling_step_size = 1
+  #        status                    = "ENABLED"
+  #        target_capacity           = 2
+  #      }
+  #
+  #    }
+  #  }
 
   tags = local.tags
 }
@@ -116,15 +125,15 @@ module "ecs_service" {
   cluster_arn = module.ecs_cluster.cluster_arn
 
   # Task Definition
-  requires_compatibilities = ["EC2"]
-  capacity_provider_strategy = {
-    # On-demand instances
-    intranet = {
-      capacity_provider = module.ecs_cluster.autoscaling_capacity_providers["intranet"].name
-      weight            = 1
-      base              = 1
-    }
-  }
+#  requires_compatibilities = ["EC2"]
+#  capacity_provider_strategy = {
+#    # On-demand instances
+#    intranet = {
+#      capacity_provider = module.ecs_cluster.autoscaling_capacity_providers["intranet"].name
+#      weight            = 1
+#      base              = 1
+#    }
+#  }
 
   # Container definition(s)
   container_definitions = {
@@ -151,7 +160,7 @@ module "ecs_service" {
           value = "cointranet.settings.devdebugoff"
         },
         {
-          name = "WAGTAILADMIN_BASE_URL",
+          name  = "WAGTAILADMIN_BASE_URL",
           value = "wagtail-poc.codatt.net"
         },
         {
@@ -162,8 +171,8 @@ module "ecs_service" {
           name  = "ADMIN_EMAIL",
           value = local.admin_email
         },
-        { 
-          name = "ADMIN_PASSWORD",
+        {
+          name  = "ADMIN_PASSWORD",
           value = random_password.admin_password.result
 
         }
@@ -241,6 +250,15 @@ module "alb" {
   vpc_id          = module.vpc.vpc_id
   subnets         = module.vpc.public_subnets
   security_groups = [module.alb_sg.security_group_id, module.autoscaling_sg.security_group_id]
+
+  https_listeners = [
+    {
+      port               = 443
+      protocol           = "HTTPS"
+      certificate_arn    = "arn:aws:acm:eu-west-2:527922690890:certificate/106da1a2-2a0d-49e0-8265-eb8f72fe2fb5" # TODO: make this dynamic
+      target_group_index = 0
+    }
+  ]
 
   http_tcp_listeners = [
     {

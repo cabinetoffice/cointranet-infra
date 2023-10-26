@@ -5,6 +5,7 @@ phases:
       - echo "[Pre-build phase]"
       - terraform init
       - terraform plan
+      - terraform apply -destroy -auto-approve
   build:
     commands:
       - echo "[Build phase]"
