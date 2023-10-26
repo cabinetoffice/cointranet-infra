@@ -732,6 +732,7 @@ module "db" {
   source = "terraform-aws-modules/rds/aws"
 
   identifier = "rds-${local.name}"
+  publicly_accessible =  true
 
   engine               = "postgres"
   engine_version       = "14"
