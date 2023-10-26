@@ -87,28 +87,28 @@ module "ecs_cluster" {
 
   default_capacity_provider_use_fargate = true
 
-  fargate_capacity_providers = {
-    FARGATE = {
-      default_capacity_provider_strategy = {
-        weight = 50
+#  fargate_capacity_providers = {
+#    FARGATE = {
+#      default_capacity_provider_strategy = {
+#        weight = 50
+#      }
+#    }
+#  }
+
+  autoscaling_capacity_providers = {
+    intranet = {
+     auto_scaling_group_arn         = module.autoscaling["intranet"].autoscaling_group_arn
+        managed_termination_protection = "ENABLED"
+  
+        managed_scaling = {
+          maximum_scaling_step_size = 2
+          minimum_scaling_step_size = 1
+          status                    = "ENABLED"
+          target_capacity           = 2
+        }
+  
       }
     }
-  }
-
-  #  autoscaling_capacity_providers = {
-  #    intranet = {
-  #      auto_scaling_group_arn         = module.autoscaling["intranet"].autoscaling_group_arn
-  #      managed_termination_protection = "ENABLED"
-  #
-  #      managed_scaling = {
-  #        maximum_scaling_step_size = 5
-  #        minimum_scaling_step_size = 1
-  #        status                    = "ENABLED"
-  #        target_capacity           = 2
-  #      }
-  #
-  #    }
-  #  }
 
   tags = local.tags
 }
