@@ -87,28 +87,28 @@ module "ecs_cluster" {
 
   default_capacity_provider_use_fargate = false
 
-#  fargate_capacity_providers = {
-#    FARGATE = {
-#      default_capacity_provider_strategy = {
-#        weight = 50
-#      }
-#    }
-#  }
+  #  fargate_capacity_providers = {
+  #    FARGATE = {
+  #      default_capacity_provider_strategy = {
+  #        weight = 50
+  #      }
+  #    }
+  #  }
 
   autoscaling_capacity_providers = {
     intranet = {
-     auto_scaling_group_arn         = module.autoscaling["intranet"].autoscaling_group_arn
-        managed_termination_protection = "ENABLED"
-  
-        managed_scaling = {
-          maximum_scaling_step_size = 2
-          minimum_scaling_step_size = 1
-          status                    = "ENABLED"
-          target_capacity           = 2
-        }
-  
+      auto_scaling_group_arn         = module.autoscaling["intranet"].autoscaling_group_arn
+      managed_termination_protection = "ENABLED"
+
+      managed_scaling = {
+        maximum_scaling_step_size = 2
+        minimum_scaling_step_size = 1
+        status                    = "ENABLED"
+        target_capacity           = 2
       }
+
     }
+  }
 
   tags = local.tags
 }
@@ -125,15 +125,15 @@ module "ecs_service" {
   cluster_arn = module.ecs_cluster.cluster_arn
 
   # Task Definition
-  #  requires_compatibilities = ["EC2"]
-  #  capacity_provider_strategy = {
-  #    # On-demand instances
-  #    intranet = {
-  #      capacity_provider = module.ecs_cluster.autoscaling_capacity_providers["intranet"].name
-  #      weight            = 1
-  #      base              = 1
-  #    }
-  #  }
+  requires_compatibilities = ["EC2"]
+  capacity_provider_strategy = {
+    # On-demand instances
+    intranet = {
+      capacity_provider = module.ecs_cluster.autoscaling_capacity_providers["intranet"].name
+      weight            = 1
+      base              = 1
+    }
+  }
   create_task_exec_iam_role = true
   create_task_exec_policy   = true
   task_exec_iam_role_policies = {
