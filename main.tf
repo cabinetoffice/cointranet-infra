@@ -125,15 +125,22 @@ module "ecs_service" {
   cluster_arn = module.ecs_cluster.cluster_arn
 
   # Task Definition
-#  requires_compatibilities = ["EC2"]
-#  capacity_provider_strategy = {
-#    # On-demand instances
-#    intranet = {
-#      capacity_provider = module.ecs_cluster.autoscaling_capacity_providers["intranet"].name
-#      weight            = 1
-#      base              = 1
-#    }
-#  }
+  #  requires_compatibilities = ["EC2"]
+  #  capacity_provider_strategy = {
+  #    # On-demand instances
+  #    intranet = {
+  #      capacity_provider = module.ecs_cluster.autoscaling_capacity_providers["intranet"].name
+  #      weight            = 1
+  #      base              = 1
+  #    }
+  #  }
+  create_task_exec_iam_role = true
+  create_task_exec_policy   = true
+  task_exec_iam_role_policies = {
+    AmazonEC2ContainerServiceforEC2Role = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role",
+    AmazonSSMManagedInstanceCore        = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+  }
+
 
   # Container definition(s)
   container_definitions = {
