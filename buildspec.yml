@@ -4,7 +4,6 @@ phases:
     commands:
       - echo "[Pre-build phase]"
       - terraform init
-      - terraform import postgresql_role.application_role wagtail
       - terraform plan
   build:
     commands:
