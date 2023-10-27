@@ -160,7 +160,7 @@ module "ecs_service" {
         },
         {
           name  = "DJANGO_LOG_LEVEL",
-          value = "DEBUG"
+          value = "WARNING"
         },
         {
           name  = "DJANGO_SETTINGS_MODULE",
