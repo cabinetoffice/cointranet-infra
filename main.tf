@@ -488,6 +488,7 @@ data "aws_iam_policy_document" "terraform_ci" {
       "application-autoscaling:*",
       "rds:*",
       "secretsmanager:*",
+      "kms:*"
     ]
 
     resources = ["*"] # TODO: lock this down to the bucket that is in use for state
