@@ -181,7 +181,10 @@ module "ecs_service" {
         {
           name  = "ADMIN_PASSWORD",
           value = random_password.admin_password.result
-
+        },
+        {
+          name = "AWS_STORAGE_BUCKET_NAME",
+          value = module.s3_bucket.s3_bucket_id
         }
       ]
 
@@ -787,4 +790,107 @@ module "db" {
   db_parameter_group_tags = {
     "Sensitive" = "low"
   }
+}
+
+################################################################################
+# S3
+################################################################################
+
+resource "aws_kms_key" "bucket" {
+  description             = "Wagtail bucket key for ${local.name}"
+  deletion_window_in_days = 7
+}
+
+resource "aws_iam_role" "bucket" {
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+data "aws_iam_policy_document" "bucket" {
+  statement {
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.bucket.arn]
+    }
+
+    actions = [
+      "s3:*",
+    ]
+
+    resources = [
+      "arn:aws:s3:::${local.name}",
+    ]
+  }
+}
+
+module "s3_bucket" {
+  source = "terraform-aws-modules/s3-bucket/aws"
+
+  bucket = local.name
+
+  force_destroy       = true
+  acceleration_status = "Suspended"
+  request_payer       = "BucketOwner"
+
+  tags = local.tags
+
+  # Note: Object Lock configuration can be enabled only on new buckets
+  # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_object_lock_configuration
+  object_lock_enabled = true
+  object_lock_configuration = {
+    rule = {
+      default_retention = {
+        mode = "GOVERNANCE"
+        days = 1
+      }
+    }
+  }
+
+  # Bucket policies
+  attach_policy                            = true
+  policy                                   = data.aws_iam_policy_document.bucket.json
+  attach_deny_insecure_transport_policy    = true
+  attach_require_latest_tls_policy         = true
+  attach_deny_incorrect_encryption_headers = true
+  attach_deny_incorrect_kms_key_sse        = true
+  allowed_kms_key_arn                      = aws_kms_key.bucket.arn
+  attach_deny_unencrypted_object_uploads   = true
+
+  # S3 Bucket Ownership Controls
+  # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_ownership_controls
+  control_object_ownership = true
+  object_ownership         = "BucketOwnerPreferred"
+
+#  expected_bucket_owner = data.aws_caller_identity.current.account_id
+
+  acl = "private" # "acl" conflicts with "grant" and "owner"
+
+  cors_rule = [
+    {
+      allowed_methods = ["GET"]
+      allowed_origins = ["*"]
+      allowed_headers = ["*"]
+      expose_headers  = ["ETag"]
+      max_age_seconds = 3000
+      }, {
+      allowed_methods = ["PUT"]
+      allowed_origins = ["*"]
+      allowed_headers = ["*"]
+      expose_headers  = ["ETag"]
+      max_age_seconds = 3000
+    }
+  ]
 }
