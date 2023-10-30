@@ -287,6 +287,10 @@ module "alb" {
     },
   ]
 
+  access_logs = {
+    bucket = "${local.name}-logs"
+  }
+
   tags = local.tags
 }
 
