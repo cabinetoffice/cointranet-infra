@@ -160,7 +160,7 @@ module "ecs_service" {
         },
         {
           name  = "DJANGO_LOG_LEVEL",
-          value = "WARNING"
+          value = "DEBUG"
         },
         {
           name  = "DJANGO_SETTINGS_MODULE",
@@ -183,8 +183,16 @@ module "ecs_service" {
           value = random_password.admin_password.result
         },
         {
-          name = "AWS_STORAGE_BUCKET_NAME",
+          name  = "AWS_STORAGE_BUCKET_NAME",
           value = module.s3_bucket.s3_bucket_id
+        },
+        {
+          name  = "AWS_ACCESS_KEY_ID",
+          value = aws_iam_access_key.wagtail.id
+        },
+        {
+          name  = "AWS_SECRET_ACCESS_KEY",
+          value = aws_iam_access_key.wagtail.secret # TODO: don't put this in environment and add some aws secret manage access from wagtail          
         }
       ]
 
@@ -240,7 +248,7 @@ module "alb_sg" {
   description = "Service security group"
   vpc_id      = module.vpc.vpc_id
 
-  ingress_rules       = ["http-80-tcp"]
+  ingress_rules       = ["http-80-tcp", "https-443-tcp"]
   ingress_cidr_blocks = ["0.0.0.0/0"]
 
   egress_rules       = ["all-all"]
@@ -393,6 +401,26 @@ module "vpc" {
 
   enable_nat_gateway = true
   single_nat_gateway = true
+
+  tags = local.tags
+}
+
+################################################################################
+# VPC Endpoints Module
+################################################################################
+
+module "vpc_endpoints" {
+  source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
+
+  vpc_id             = module.vpc.vpc_id
+  security_group_ids = [module.autoscaling_sg.security_group_id]
+
+  endpoints = {
+    s3 = {
+      service = "s3"
+      tags    = { Name = "s3-vpc-endpoint" }
+    }
+  }
 
   tags = local.tags
 }
@@ -739,8 +767,8 @@ resource "postgresql_role" "application_role" {
 module "db" {
   source = "terraform-aws-modules/rds/aws"
 
-  identifier = "rds-${local.name}"
-  publicly_accessible =  true
+  identifier          = "rds-${local.name}"
+  publicly_accessible = true
 
   engine               = "postgres"
   engine_version       = "14"
@@ -828,7 +856,7 @@ data "aws_iam_policy_document" "bucket" {
   statement {
     principals {
       type        = "AWS"
-      identifiers = [aws_iam_role.bucket.arn]
+      identifiers = [aws_iam_role.bucket.arn, aws_iam_user.wagtail.arn]
     }
 
     actions = [
@@ -837,6 +865,7 @@ data "aws_iam_policy_document" "bucket" {
 
     resources = [
       "arn:aws:s3:::${local.name}",
+      "arn:aws:s3:::${local.name}/*",
     ]
   }
 }
@@ -852,36 +881,24 @@ module "s3_bucket" {
 
   tags = local.tags
 
-  # Note: Object Lock configuration can be enabled only on new buckets
-  # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_object_lock_configuration
-  object_lock_enabled = true
-  object_lock_configuration = {
-    rule = {
-      default_retention = {
-        mode = "GOVERNANCE"
-        days = 1
-      }
-    }
-  }
-
   # Bucket policies
-  attach_policy                            = true
-  policy                                   = data.aws_iam_policy_document.bucket.json
-  attach_deny_insecure_transport_policy    = true
-  attach_require_latest_tls_policy         = true
-  attach_deny_incorrect_encryption_headers = true
-  attach_deny_incorrect_kms_key_sse        = true
-  allowed_kms_key_arn                      = aws_kms_key.bucket.arn
-  attach_deny_unencrypted_object_uploads   = true
+  attach_policy                         = true
+  policy                                = data.aws_iam_policy_document.bucket.json
+  attach_deny_insecure_transport_policy = true
+  attach_require_latest_tls_policy      = true
+  #  attach_deny_incorrect_encryption_headers = true
+  #  attach_deny_incorrect_kms_key_sse        = true
+  allowed_kms_key_arn = aws_kms_key.bucket.arn
+  #  attach_deny_unencrypted_object_uploads   = true
 
   # S3 Bucket Ownership Controls
   # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_ownership_controls
-  control_object_ownership = true
-  object_ownership         = "BucketOwnerPreferred"
+  #  control_object_ownership = true
+  #  object_ownership         = "BucketOwnerPreferred"
 
-#  expected_bucket_owner = data.aws_caller_identity.current.account_id
+  #  expected_bucket_owner = aws_iam_user.wagtail.id
 
-  acl = "private" # "acl" conflicts with "grant" and "owner"
+  #  acl = "private" # "acl" conflicts with "grant" and "owner"
 
   cors_rule = [
     {
@@ -896,12 +913,18 @@ module "s3_bucket" {
       allowed_headers = ["*"]
       expose_headers  = ["ETag"]
       max_age_seconds = 3000
+      }, {
+      allowed_methods = ["POST"]
+      allowed_origins = ["*"]
+      allowed_headers = ["*"]
+      expose_headers  = ["ETag"]
+      max_age_seconds = 3000
     }
   ]
 }
 
 module "log_bucket" {
-  source  = "terraform-aws-modules/s3-bucket/aws"
+  source = "terraform-aws-modules/s3-bucket/aws"
 
   bucket_prefix = "${local.name}-logs-"
   acl           = "log-delivery-write"
@@ -919,4 +942,50 @@ module "log_bucket" {
   attach_require_latest_tls_policy      = true
 
   tags = local.tags
+}
+
+
+#
+# Wagtail auth
+#
+
+data "aws_iam_policy_document" "wagtail_media" {
+  statement {
+    sid = "100"
+
+    actions = [
+      "s3:*",
+    ]
+
+    resources = [
+      "arn:aws:s3:::${module.s3_bucket.s3_bucket_id}",
+      "arn:aws:s3:::${module.s3_bucket.s3_bucket_id}/*",
+    ]
+  }
+  statement {
+
+    actions = [
+      "s3:ListBucket",
+    ]
+
+    resources = [
+      "arn:aws:s3:::*",
+    ]
+  }
+
+}
+
+resource "aws_iam_access_key" "wagtail" {
+  user = aws_iam_user.wagtail.name
+}
+
+resource "aws_iam_user" "wagtail" {
+  name = "wagtail_media_uploader"
+  path = "/robots/"
+}
+
+resource "aws_iam_user_policy" "wagtail" {
+  name   = "wagtail"
+  user   = aws_iam_user.wagtail.name
+  policy = data.aws_iam_policy_document.wagtail_media.json
 }
