@@ -56,6 +56,11 @@ data "aws_secretsmanager_secret_version" "postgres_password" {
   secret_id = module.db.db_instance_master_user_secret_arn
 }
 
+data "aws_ip_ranges" "s3_ranges" {
+  regions  = ["eu-west-2"]
+  services = ["s3"]
+}
+
 locals {
   admin_email = "co-intranet-project@cabinetoffice.gov.uk"
 
@@ -94,6 +99,14 @@ module "ecs_cluster" {
   #      }
   #    }
   #  }
+  cluster_configuration = {
+    execute_command_configuration = {
+      logging = "OVERRIDE"
+      log_configuration = {
+        cloud_watch_log_group_name = "/aws/ecs/${local.name}"
+      }
+    }
+  }
 
   autoscaling_capacity_providers = {
     intranet = {
@@ -124,6 +137,9 @@ module "ecs_service" {
   name        = local.name
   cluster_arn = module.ecs_cluster.cluster_arn
 
+  cpu    = 2048
+  memory = 4096
+
   # Task Definition
   requires_compatibilities = ["EC2"]
   capacity_provider_strategy = {
@@ -145,7 +161,7 @@ module "ecs_service" {
   # Container definition(s)
   container_definitions = {
     (local.container_name) = {
-      image = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}" # TODO: use a real image!
+      image = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}:latest"
       port_mappings = [
         {
           name          = local.container_name
@@ -160,7 +176,7 @@ module "ecs_service" {
         },
         {
           name  = "DJANGO_LOG_LEVEL",
-          value = "DEBUG"
+          value = "ERROR"
         },
         {
           name  = "DJANGO_SETTINGS_MODULE",
@@ -193,6 +209,10 @@ module "ecs_service" {
         {
           name  = "AWS_SECRET_ACCESS_KEY",
           value = aws_iam_access_key.wagtail.secret # TODO: don't put this in environment and add some aws secret manage access from wagtail          
+        },
+        {
+          name = "AWS_S3_VPCE_DNS",
+          value = trimprefix(aws_vpc_endpoint.s3.dns_entry[0].dns_name, "*.")
         }
       ]
 
@@ -268,6 +288,8 @@ module "alb" {
   vpc_id          = module.vpc.vpc_id
   subnets         = module.vpc.public_subnets
   security_groups = [module.alb_sg.security_group_id, module.autoscaling_sg.security_group_id]
+  preserve_host_header = true
+  enable_http2 = false
 
   https_listeners = [
     {
@@ -378,9 +400,9 @@ module "autoscaling_sg" {
     {
       rule                     = "http-8080-tcp"
       source_security_group_id = module.alb_sg.security_group_id
-    }
+    },
   ]
-  number_of_computed_ingress_with_source_security_group_id = 2
+  number_of_computed_ingress_with_source_security_group_id = 3
 
   egress_rules = ["all-all"]
 
@@ -389,7 +411,8 @@ module "autoscaling_sg" {
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+#  version = "~> 5.0"
+  version = "5.1.2"
 
   name = local.name
   cidr = local.vpc_cidr
@@ -401,6 +424,16 @@ module "vpc" {
 
   enable_nat_gateway = true
   single_nat_gateway = true
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+#  default_route_table_routes = [
+#    for cidr in data.aws_ip_ranges.s3_ranges["cidr_blocks"]: {
+#      foo = 
+#      vpc_endpoint_id = module.vpc_endpoints.vpc_endpoint_id["s3"]
+#    }
+#  ]
+  
 
   tags = local.tags
 }
@@ -409,20 +442,34 @@ module "vpc" {
 # VPC Endpoints Module
 ################################################################################
 
-module "vpc_endpoints" {
-  source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
+#module "vpc_endpoints" {
+#  source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
 
-  vpc_id             = module.vpc.vpc_id
+#  vpc_id             = module.vpc.vpc_id
+#  security_group_ids = [module.autoscaling_sg.security_group_id]
+#
+#  endpoints = {
+#    s3 = {
+#      service = "s3"
+#      service_type = "Gateway"
+#      subnet_ids = flatten([module.vpc.private_subnets])
+#      route_table_ids = flatten([module.vpc.private_route_table_ids,module.vpc.public_route_table_ids])
+#      tags    = { Name = "s3-vpc-endpoint" }
+#    }
+#  }
+
+#  tags = local.tags
+#}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = module.vpc.vpc_id
+  service_name      = "com.amazonaws.eu-west-2.s3"
+  vpc_endpoint_type = "Interface"
+
   security_group_ids = [module.autoscaling_sg.security_group_id]
-
-  endpoints = {
-    s3 = {
-      service = "s3"
-      tags    = { Name = "s3-vpc-endpoint" }
-    }
-  }
-
-  tags = local.tags
+  subnet_ids = module.vpc.private_subnets
+#  route_table_ids = module.vpc.private_route_table_ids
+#  private_dns_enabled = true
 }
 
 module "ecr" {
