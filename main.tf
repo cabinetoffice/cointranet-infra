@@ -176,11 +176,15 @@ module "ecs_service" {
         },
         {
           name  = "DJANGO_LOG_LEVEL",
-          value = "ERROR"
+          value = "INFO"
+        },
+        {
+          name = "REDIS_URL"
+          value = "redis://cache.csb5vn.0001.euw2.cache.amazonaws.com:6379"	
         },
         {
           name  = "DJANGO_SETTINGS_MODULE",
-          value = "cointranet.settings.dev"
+          value = "cointranet.settings.base"
         },
         {
           name  = "WAGTAILADMIN_BASE_URL",
@@ -212,7 +216,8 @@ module "ecs_service" {
         },
         {
           name = "AWS_S3_VPCE_DNS",
-          value = trimprefix(aws_vpc_endpoint.s3.dns_entry[0].dns_name, "*.")
+#          value = trimprefix(aws_vpc_endpoint.s3.dns_entry[0].dns_name, "*.")
+          value = "s3.eu-west-2.amazonaws.com"
         }
       ]
 
@@ -245,6 +250,20 @@ module "ecs_service" {
       to_port     = 5432
       protocol    = "tcp"
       cidr_blocks = module.vpc.database_subnets_cidr_blocks # TODO: pick right subnets
+    }
+    s3_egress_all = {
+      type        = "egress"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = data.aws_ip_ranges.s3_ranges.cidr_blocks # TODO: pick right subnets
+    }
+    redis_egress_all = {
+      type        = "egress"
+      from_port   = 6379
+      to_port     = 6379
+      protocol    = "tcp"
+      cidr_blocks = module.vpc.private_subnets_cidr_blocks # TODO: pick right subnets
     }
   }
 
@@ -300,13 +319,13 @@ module "alb" {
     }
   ]
 
-  http_tcp_listeners = [
-    {
-      port               = 80
-      protocol           = "HTTP"
-      target_group_index = 0
-    },
-  ]
+#  http_tcp_listeners = [
+#    {
+#      port               = 80
+#      protocol           = "HTTP"
+#      target_group_index = 0
+#    },
+#  ]
 
   target_groups = [
     {
@@ -400,7 +419,7 @@ module "autoscaling_sg" {
     {
       rule                     = "http-8080-tcp"
       source_security_group_id = module.alb_sg.security_group_id
-    },
+    }
   ]
   number_of_computed_ingress_with_source_security_group_id = 2
 
@@ -907,13 +926,40 @@ data "aws_iam_policy_document" "bucket" {
     }
 
     actions = [
-      "s3:*",
+      "s3:ListBucket",
     ]
 
     resources = [
       "arn:aws:s3:::${local.name}",
+    ]
+  }
+  statement {
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.bucket.arn, aws_iam_user.wagtail.arn]
+    }
+
+    actions = [
+      "s3:*",
+    ]
+
+    resources = [
       "arn:aws:s3:::${local.name}/*",
     ]
+  }
+  statement {
+    principals {
+      type = "*"
+      identifiers = ["*"]
+    }
+  	effect = "Allow"
+  	actions = [
+  		"s3:getObject"
+  	]
+
+  	resources = [
+  		"arn:aws:s3:::${local.name}/*"
+  	]
   }
 }
 
@@ -924,50 +970,32 @@ module "s3_bucket" {
 
   force_destroy       = true
   acceleration_status = "Suspended"
-  request_payer       = "BucketOwner"
+  #request_payer       = "BucketOwner"
 
   tags = local.tags
 
   # Bucket policies
   attach_policy                         = true
   policy                                = data.aws_iam_policy_document.bucket.json
-  attach_deny_insecure_transport_policy = true
-  attach_require_latest_tls_policy      = true
+  attach_deny_insecure_transport_policy = false
+  attach_require_latest_tls_policy      = false
   #  attach_deny_incorrect_encryption_headers = true
   #  attach_deny_incorrect_kms_key_sse        = true
-  allowed_kms_key_arn = aws_kms_key.bucket.arn
+  # allowed_kms_key_arn = aws_kms_key.bucket.arn
   #  attach_deny_unencrypted_object_uploads   = true
+   block_public_acls = false
+   block_public_policy = false
+   ignore_public_acls = false
+   restrict_public_buckets = false
 
   # S3 Bucket Ownership Controls
   # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_ownership_controls
-  #  control_object_ownership = true
+  control_object_ownership = false
   #  object_ownership         = "BucketOwnerPreferred"
 
   #  expected_bucket_owner = aws_iam_user.wagtail.id
 
   #  acl = "private" # "acl" conflicts with "grant" and "owner"
-
-  cors_rule = [
-    {
-      allowed_methods = ["GET"]
-      allowed_origins = ["*"]
-      allowed_headers = ["*"]
-      expose_headers  = ["ETag"]
-      max_age_seconds = 3000
-      }, {
-      allowed_methods = ["PUT"]
-      allowed_origins = ["*"]
-      allowed_headers = ["*"]
-      expose_headers  = ["ETag"]
-      max_age_seconds = 3000
-      }, {
-      allowed_methods = ["POST"]
-      allowed_origins = ["*"]
-      allowed_headers = ["*"]
-      expose_headers  = ["ETag"]
-      max_age_seconds = 3000
-    }
-  ]
 }
 
 module "log_bucket" {
@@ -998,28 +1026,27 @@ module "log_bucket" {
 
 data "aws_iam_policy_document" "wagtail_media" {
   statement {
-    sid = "100"
+    sid = "ListObjectsInBucket"
+    actions = [
+      "s3:ListBucket",
+    ]
+
+    resources = [
+      "arn:aws:s3:::${module.s3_bucket.s3_bucket_id}",
+    ]
+  }
+
+  statement {
+    sid = "AllObjectActions"
 
     actions = [
       "s3:*",
     ]
 
     resources = [
-      "arn:aws:s3:::${module.s3_bucket.s3_bucket_id}",
       "arn:aws:s3:::${module.s3_bucket.s3_bucket_id}/*",
     ]
   }
-  statement {
-
-    actions = [
-      "s3:ListBucket",
-    ]
-
-    resources = [
-      "arn:aws:s3:::*",
-    ]
-  }
-
 }
 
 resource "aws_iam_access_key" "wagtail" {
@@ -1035,4 +1062,24 @@ resource "aws_iam_user_policy" "wagtail" {
   name   = "wagtail"
   user   = aws_iam_user.wagtail.name
   policy = data.aws_iam_policy_document.wagtail_media.json
+}
+
+#
+# Redis
+#
+
+resource "aws_elasticache_cluster" "cache" {
+  cluster_id           = "cache"
+  engine               = "redis"
+  node_type            = "cache.t4g.micro"
+  num_cache_nodes      = 1
+  parameter_group_name = "default.redis6.x"
+  subnet_group_name = aws_elasticache_subnet_group.cache.name
+  engine_version       = "6.2"
+  port                 = 6379
+}
+
+resource "aws_elasticache_subnet_group" "cache" {
+  name       = "cache"
+  subnet_ids = module.vpc.private_subnets
 }
