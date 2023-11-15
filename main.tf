@@ -76,6 +76,8 @@ locals {
 
   codestar = "arn:aws:codestar-connections:eu-west-2:527922690890:connection/d277085d-2da1-4954-9143-93f7db172ea0"
 
+  co_ip_ranges = ["51.149.8.0/25","51.149.9.112/29","51.149.9.240/29"]
+
   tags = {
     Name = local.name
   }
@@ -288,7 +290,7 @@ module "alb_sg" {
   vpc_id      = module.vpc.vpc_id
 
   ingress_rules       = ["http-80-tcp", "https-443-tcp"]
-  ingress_cidr_blocks = ["0.0.0.0/0"]
+  ingress_cidr_blocks = local.co_ip_ranges
 
   egress_rules       = ["all-all"]
   egress_cidr_blocks = module.vpc.public_subnets_cidr_blocks
