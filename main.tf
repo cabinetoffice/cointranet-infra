@@ -948,20 +948,6 @@ data "aws_iam_policy_document" "bucket" {
       "arn:aws:s3:::${local.name}/*",
     ]
   }
-  statement {
-    principals {
-      type = "*"
-      identifiers = ["*"]
-    }
-  	effect = "Allow"
-  	actions = [
-  		"s3:getObject"
-  	]
-
-  	resources = [
-  		"arn:aws:s3:::${local.name}/*"
-  	]
-  }
 }
 
 module "s3_bucket" {
@@ -985,7 +971,7 @@ module "s3_bucket" {
   # allowed_kms_key_arn = aws_kms_key.bucket.arn
   #  attach_deny_unencrypted_object_uploads   = true
    block_public_acls = false
-   block_public_policy = false
+   block_public_policy = true
    ignore_public_acls = false
    restrict_public_buckets = false
 
