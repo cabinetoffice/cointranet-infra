@@ -76,7 +76,7 @@ locals {
 
   codestar = "arn:aws:codestar-connections:eu-west-2:527922690890:connection/d277085d-2da1-4954-9143-93f7db172ea0"
 
-  co_ip_ranges = ["51.149.8.0/25","51.149.9.112/29","51.149.9.240/29"]
+	  co_ip_ranges = ["51.149.8.0/25","51.149.9.112/29","51.149.9.240/29"]
 
   tags = {
     Name = local.name
@@ -936,6 +936,7 @@ data "aws_iam_policy_document" "bucket" {
       "arn:aws:s3:::${local.name}",
     ]
   }
+  
   statement {
     principals {
       type        = "AWS"
@@ -949,6 +950,27 @@ data "aws_iam_policy_document" "bucket" {
     resources = [
       "arn:aws:s3:::${local.name}/*",
     ]
+  }
+  
+  statement {
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions = [
+      "s3:Get*",
+    ]
+
+    resources = [
+      "arn:aws:s3:::${local.name}/*",
+    ]
+
+    condition {
+      test  = "IpAddress"
+      variable = "aws:SourceIP" 
+      values = local.co_ip_ranges
+    }
   }
 }
 
@@ -973,7 +995,7 @@ module "s3_bucket" {
   # allowed_kms_key_arn = aws_kms_key.bucket.arn
   #  attach_deny_unencrypted_object_uploads   = true
    block_public_acls = false
-   block_public_policy = true
+   block_public_policy = false
    ignore_public_acls = false
    restrict_public_buckets = false
 
@@ -984,7 +1006,7 @@ module "s3_bucket" {
 
   expected_bucket_owner = local.account_id
 
-  #  acl = "private" # "acl" conflicts with "grant" and "owner"
+  acl = "public-read" # "acl" conflicts with "grant" and "owner"
 }
 
 module "log_bucket" {
