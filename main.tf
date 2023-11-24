@@ -4,8 +4,8 @@
 
 terraform {
   backend "s3" {
-    bucket = "co-digital-proof-of-concepts-tfstate"
-    key    = "terraform/dev"
+    bucket = "cointranet-wagtail"
+    key    = "terraform/cointranet"
     region = "eu-west-2"
   }
 }
@@ -62,24 +62,28 @@ data "aws_ip_ranges" "s3_ranges" {
 }
 
 locals {
-  admin_email = "co-intranet-project@cabinetoffice.gov.uk"
+  admin_email = "co-intranet-project@cabinetoffice.gov.uk" # param
 
   region     = "eu-west-2"
   name       = basename(path.cwd)
   account_id = data.aws_caller_identity.current.account_id
+  workspace = terraform.workspace
+  dns = "intranet.codatt.net"
 
-  vpc_cidr = "10.0.0.0/16" # TODO: do we definitely need these to be unique?
+  vpc_cidr = "10.0.0.0/16" # param
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 
   container_name = "wagtail"
   container_port = 8080
 
-  codestar = "arn:aws:codestar-connections:eu-west-2:527922690890:connection/d277085d-2da1-4954-9143-93f7db172ea0"
+  codestar = "arn:aws:codestar-connections:eu-west-2:527922690890:connection/d277085d-2da1-4954-9143-93f7db172ea0" # param
+  acm_certificate_arn = "arn:aws:acm:eu-west-2:503646200365:certificate/9fd40d1d-d3a7-41e0-925b-734da58e2e37"
 
-	  co_ip_ranges = ["51.149.8.0/25","51.149.9.112/29","51.149.9.240/29"]
+  allowed_ip_ranges = ["51.149.8.0/25","51.149.9.112/29","51.149.9.240/29"] # param
 
   tags = {
     Name = local.name
+    Workspace = terraform.workspace
   }
 }
 
@@ -218,7 +222,6 @@ module "ecs_service" {
         },
         {
           name = "AWS_S3_VPCE_DNS",
-#          value = trimprefix(aws_vpc_endpoint.s3.dns_entry[0].dns_name, "*.")
           value = "s3.eu-west-2.amazonaws.com"
         }
       ]
@@ -251,25 +254,71 @@ module "ecs_service" {
       from_port   = 5432
       to_port     = 5432
       protocol    = "tcp"
-      cidr_blocks = module.vpc.database_subnets_cidr_blocks # TODO: pick right subnets
+      cidr_blocks = module.vpc.database_subnets_cidr_blocks
     }
     s3_egress_all = {
       type        = "egress"
       from_port   = 443
       to_port     = 443
       protocol    = "tcp"
-      cidr_blocks = data.aws_ip_ranges.s3_ranges.cidr_blocks # TODO: pick right subnets
+      cidr_blocks = data.aws_ip_ranges.s3_ranges.cidr_blocks
     }
     redis_egress_all = {
       type        = "egress"
       from_port   = 6379
       to_port     = 6379
       protocol    = "tcp"
-      cidr_blocks = module.vpc.private_subnets_cidr_blocks # TODO: pick right subnets
+      cidr_blocks = module.vpc.private_subnets_cidr_blocks
     }
   }
 
   tags = local.tags
+}
+
+module "ecs_scheduled_task" {
+  source                = "git::https://github.com/tmknom/terraform-aws-ecs-scheduled-task.git?ref=tags/2.0.0"
+  name                  = "content"
+  schedule_expression   = "rate(2 minutes)"
+  cluster_arn           = module.ecs_cluster.cluster_arn
+  subnets               = module.vpc.private_subnets
+  security_groups       = [module.autoscaling_sg.security_group_id]
+  ecs_task_execution_role_arn = module.ecs_service.task_exec_iam_role_arn
+
+    container_definitions = jsonencode([
+    {
+      name      = "publish_scheduled_articles"
+      image     = "${local.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.name}:latest"
+      environment = [{
+              name  = "DJANGO_SECRET_KEY",
+        value = random_password.django_secret_key.result
+        },
+        {
+          name  = "DJANGO_LOG_LEVEL",
+          value = "INFO"
+        },
+        {
+          name  = "DJANGO_SETTINGS_MODULE",
+          value = "cointranet.settings.base"
+        },
+        {
+          name  = "DATABASE_URL",
+          value = "postgres://wagtail:${random_password.application_password.result}@${null_resource.postgres.triggers.endpoint}/wagtail"
+        }]
+              logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+        awslogs-stream-prefix = "content-scheduler"
+        awslogs-group         = "/aws/ecs/${local.name}"
+        awslogs-region        = local.region
+        awslogs-create-group = "true"
+        }
+      }
+      
+      essential = true
+      command = ["-v", "3"]
+      entrypoint = ["/venv/bin/python","manage.py","publish_scheduled"]
+    }
+  ])
 }
 
 ################################################################################
@@ -290,7 +339,7 @@ module "alb_sg" {
   vpc_id      = module.vpc.vpc_id
 
   ingress_rules       = ["http-80-tcp", "https-443-tcp"]
-  ingress_cidr_blocks = local.co_ip_ranges
+  ingress_cidr_blocks = local.allowed_ip_ranges
 
   egress_rules       = ["all-all"]
   egress_cidr_blocks = module.vpc.public_subnets_cidr_blocks
@@ -316,18 +365,10 @@ module "alb" {
     {
       port               = 443
       protocol           = "HTTPS"
-      certificate_arn    = "arn:aws:acm:eu-west-2:527922690890:certificate/106da1a2-2a0d-49e0-8265-eb8f72fe2fb5" # TODO: make this dynamic
+      certificate_arn    = local.acm_certificate_arn # TODO: make this dynamic
       target_group_index = 0
     }
   ]
-
-#  http_tcp_listeners = [
-#    {
-#      port               = 80
-#      protocol           = "HTTP"
-#      target_group_index = 0
-#    },
-#  ]
 
   target_groups = [
     {
@@ -344,6 +385,35 @@ module "alb" {
 
   tags = local.tags
 }
+
+#module "zones" {
+#  source  = "terraform-aws-modules/route53/aws//modules/zones"
+#  version = "~> 2.0"
+#
+#  zones = {
+#    (local.dns) = {
+#      comment = "wagtail intranet zone - ${local.workspace} - ${local.name}"
+#      tags = local.tags
+#    }
+#  }
+#
+#  tags = local.tags
+#}
+
+
+#module "acm" {
+#  source  = "terraform-aws-modules/acm/aws"
+#  version = "~> 4.0"
+#
+#  domain_name  = local.dns
+#  zone_id      = module.zones.route53_zone_zone_id[local.dns]
+#
+#  validation_method = "EMAIL"
+#
+#  wait_for_validation = true
+#
+#  tags = local.tags
+#}
 
 module "autoscaling" {
   source  = "terraform-aws-modules/autoscaling/aws"
@@ -448,39 +518,12 @@ module "vpc" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-#  default_route_table_routes = [
-#    for cidr in data.aws_ip_ranges.s3_ranges["cidr_blocks"]: {
-#      foo = 
-#      vpc_endpoint_id = module.vpc_endpoints.vpc_endpoint_id["s3"]
-#    }
-#  ]
-  
-
   tags = local.tags
 }
 
 ################################################################################
 # VPC Endpoints Module
 ################################################################################
-
-#module "vpc_endpoints" {
-#  source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
-
-#  vpc_id             = module.vpc.vpc_id
-#  security_group_ids = [module.autoscaling_sg.security_group_id]
-#
-#  endpoints = {
-#    s3 = {
-#      service = "s3"
-#      service_type = "Gateway"
-#      subnet_ids = flatten([module.vpc.private_subnets])
-#      route_table_ids = flatten([module.vpc.private_route_table_ids,module.vpc.public_route_table_ids])
-#      tags    = { Name = "s3-vpc-endpoint" }
-#    }
-#  }
-
-#  tags = local.tags
-#}
 
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = module.vpc.vpc_id
@@ -526,8 +569,9 @@ module "ecr" {
 # Continuous integration
 ################################################################################
 
-data "aws_codestarconnections_connection" "co" {
-  arn = local.codestar
+resource "aws_codestarconnections_connection" "github" {
+  name          = "github-${terraform.workspace}"
+  provider_type = "GitHub"
 }
 
 data "aws_iam_policy_document" "terraform_assume_role" {
@@ -556,7 +600,7 @@ data "aws_iam_policy_document" "terraform_ci" {
       "codestar-connections:GetConnection",
       "codestar-connections:ListTagsForResource",
     ]
-    resources = [data.aws_codestarconnections_connection.co.arn]
+    resources = [aws_codestarconnections_connection.github.arn]
   }
 
   statement {
@@ -688,7 +732,7 @@ data "aws_iam_policy_document" "docker_ci" {
   statement {
     effect    = "Allow"
     actions   = ["codestar-connections:UseConnection"]
-    resources = [data.aws_codestarconnections_connection.co.arn]
+    resources = [aws_codestarconnections_connection.github.arn]
   }
 
   statement {
@@ -837,7 +881,7 @@ module "db" {
   source = "terraform-aws-modules/rds/aws"
 
   identifier          = "rds-${local.name}"
-  publicly_accessible = true
+  publicly_accessible = false
 
   engine               = "postgres"
   engine_version       = "14"
@@ -933,7 +977,7 @@ data "aws_iam_policy_document" "bucket" {
     ]
 
     resources = [
-      "arn:aws:s3:::${local.name}",
+      "arn:aws:s3:::${local.name}-${local.account_id}-${local.workspace}",
     ]
   }
   
@@ -948,7 +992,7 @@ data "aws_iam_policy_document" "bucket" {
     ]
 
     resources = [
-      "arn:aws:s3:::${local.name}/*",
+      "arn:aws:s3:::${local.name}-${local.account_id}-${local.workspace}/*",
     ]
   }
   
@@ -963,13 +1007,13 @@ data "aws_iam_policy_document" "bucket" {
     ]
 
     resources = [
-      "arn:aws:s3:::${local.name}/*",
+      "arn:aws:s3:::${local.name}-${local.account_id}-${local.workspace}/*",
     ]
 
     condition {
       test  = "IpAddress"
       variable = "aws:SourceIP" 
-      values = local.co_ip_ranges
+      values = local.allowed_ip_ranges
     }
   }
 }
@@ -977,7 +1021,7 @@ data "aws_iam_policy_document" "bucket" {
 module "s3_bucket" {
   source = "terraform-aws-modules/s3-bucket/aws"
 
-  bucket = local.name
+  bucket = "${local.name}-${local.account_id}-${local.workspace}" # name, account number, workspace
 
   force_destroy       = true
   acceleration_status = "Suspended"
