@@ -187,7 +187,7 @@ module "ecs_service" {
         {
           name = "CSRF_TRUSTED_ORIGINS",
           value = "https://${local.dns}"
-        }
+        },
         {
           name = "REDIS_URL"
           value = "redis://cache.csb5vn.0001.euw2.cache.amazonaws.com:6379"	
@@ -704,16 +704,16 @@ resource "aws_codebuild_project" "terraform_ci" {
 }
 
 
-#resource "aws_codebuild_webhook" "terraform_ci" {
-#  project_name = aws_codebuild_project.terraform_ci.name
-#  build_type   = "BUILD"
-#  filter_group {
-#    filter {
-#      type    = "EVENT"
-#      pattern = "PUSH"
-#    }
-#  }
-#}
+resource "aws_codebuild_webhook" "terraform_ci" {
+  project_name = aws_codebuild_project.terraform_ci.name
+  build_type   = "BUILD"
+  filter_group {
+    filter {
+      type    = "EVENT"
+      pattern = "PUSH"
+    }
+  }
+}
 
 data "aws_iam_policy_document" "docker_assume_role" {
   statement {
@@ -816,7 +816,7 @@ resource "aws_codebuild_project" "docker_ci" {
 
   source {
     type            = "GITHUB"
-    location        = "https://github.com/cabinetoffice/co-wagtail-base.git"
+    location        = "https://github.com/cabinetoffice/co-wagtail-base.git" # TODO: parameterise based on forks
     git_clone_depth = 1
 
     git_submodules_config {
@@ -829,16 +829,16 @@ resource "aws_codebuild_project" "docker_ci" {
   tags = local.tags
 }
 
-#resource "aws_codebuild_webhook" "docker_ci" {
-#  project_name = aws_codebuild_project.docker_ci.name
-#  build_type   = "BUILD"
-#  filter_group {
-#    filter {
-#      type    = "EVENT"
-#      pattern = "PUSH"
-#    }
-#  }
-#}
+resource "aws_codebuild_webhook" "docker_ci" {
+  project_name = aws_codebuild_project.docker_ci.name
+  build_type   = "BUILD"
+  filter_group {
+    filter {
+      type    = "EVENT"
+      pattern = "PUSH"
+    }
+  }
+}
 
 ################################################################################
 # RDS / PostgresQL
