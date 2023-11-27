@@ -185,6 +185,10 @@ module "ecs_service" {
           value = "INFO"
         },
         {
+          name = "CSRF_TRUSTED_ORIGINS",
+          value = "https://${local.dns}"
+        }
+        {
           name = "REDIS_URL"
           value = "redis://cache.csb5vn.0001.euw2.cache.amazonaws.com:6379"	
         },
