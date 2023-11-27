@@ -633,7 +633,8 @@ data "aws_iam_policy_document" "terraform_ci" {
       "rds:*",
       "secretsmanager:*",
       "kms:*",
-      "elasticache:*"
+      "elasticache:*",
+      "events:*"
     ]
 
     resources = ["*"] # TODO: lock this down to the bucket that is in use for state
@@ -699,16 +700,16 @@ resource "aws_codebuild_project" "terraform_ci" {
 }
 
 
-resource "aws_codebuild_webhook" "terraform_ci" {
-  project_name = aws_codebuild_project.terraform_ci.name
-  build_type   = "BUILD"
-  filter_group {
-    filter {
-      type    = "EVENT"
-      pattern = "PUSH"
-    }
-  }
-}
+#resource "aws_codebuild_webhook" "terraform_ci" {
+#  project_name = aws_codebuild_project.terraform_ci.name
+#  build_type   = "BUILD"
+#  filter_group {
+#    filter {
+#      type    = "EVENT"
+#      pattern = "PUSH"
+#    }
+#  }
+#}
 
 data "aws_iam_policy_document" "docker_assume_role" {
   statement {
@@ -824,16 +825,16 @@ resource "aws_codebuild_project" "docker_ci" {
   tags = local.tags
 }
 
-resource "aws_codebuild_webhook" "docker_ci" {
-  project_name = aws_codebuild_project.docker_ci.name
-  build_type   = "BUILD"
-  filter_group {
-    filter {
-      type    = "EVENT"
-      pattern = "PUSH"
-    }
-  }
-}
+#resource "aws_codebuild_webhook" "docker_ci" {
+#  project_name = aws_codebuild_project.docker_ci.name
+#  build_type   = "BUILD"
+#  filter_group {
+#    filter {
+#      type    = "EVENT"
+#      pattern = "PUSH"
+#    }
+#  }
+#}
 
 ################################################################################
 # RDS / PostgresQL
